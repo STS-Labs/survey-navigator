@@ -913,12 +913,17 @@ export class Navigator {
   update(fix) {
     // fix: {x, y, t (ms), acc, speed (m/s|null), heading (deg|null)}
     this.events = [];
+    // A rough fix (network location, Precise Location off) is not acted on, and not kept as the last
+    // fix either: a jump from it to the first precise fix would look like fast driving in some direction
+    if (fix.acc != null && fix.acc > 80) return this.snapshot();
     const prev = this.lastFix;
     let heading = fix.heading, speed = fix.speed;
     if (prev) {
       const moved = Math.hypot(fix.x - prev.x, fix.y - prev.y), dt = Math.max(0.2, (fix.t - prev.t) / 1000);
-      if ((heading == null || Number.isNaN(heading)) && moved > 4) heading = bearing(prev.x, prev.y, fix.x, fix.y);
-      if (speed == null || Number.isNaN(speed)) speed = moved / dt;
+      // Only work out heading and speed from two close, recent, sharp fixes
+      const usable = dt <= 6 && moved < 200 && (prev.acc == null || prev.acc <= 35) && (fix.acc == null || fix.acc <= 35);
+      if ((heading == null || Number.isNaN(heading)) && moved > 4 && usable) heading = bearing(prev.x, prev.y, fix.x, fix.y);
+      if (speed == null || Number.isNaN(speed)) speed = usable ? moved / dt : 0;
     }
     if (heading != null && Number.isNaN(heading)) heading = null;
     speed = speed || 0;
@@ -926,7 +931,6 @@ export class Navigator {
     this.lastFix = { ...fix, heading, speed };
     this.heading = heading; this.speed = speed;
     if (this.mode === 'idle' || this.mode === 'done') return this.snapshot();
-    if (fix.acc != null && fix.acc > 80) return this.snapshot();    // too vague to act on
 
     const tol = clamp(fix.acc ? fix.acc * 1.3 : ON_TOL, ON_TOL, 55);
     if (this.mode === 'acquire') {

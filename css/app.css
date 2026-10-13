@@ -89,6 +89,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .car svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .4)); }
 .car.off svg circle { fill: #f59e0b; }
 
+.gpshelp {
+  margin-top: 8px; width: 100%; background: var(--panel); color: var(--ink); border-radius: 16px; padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .25); pointer-events: auto; border-left: 6px solid var(--amber);
+}
+.gh-title { font-size: 18px; font-weight: 750; }
+.gh-text { font-size: 15px; margin-top: 6px; line-height: 1.4; }
+.gh-btns { display: flex; gap: 8px; }
+.gh-btns .btn { flex: 1; padding: 12px 10px; font-size: 16px; }
+.gpschip { display: inline-flex; align-items: center; gap: 6px; font-weight: 650; }
+.gpschip::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.gpschip.good { color: #15803d; } .gpschip.fair { color: #b45309; } .gpschip.poor { color: var(--red); }
+.gpschip.none { color: var(--muted); } .gpschip.sim { color: var(--blue); }
+
 /* ---------------------------------------------------------------- menu sheet */
 .sheet-back { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, .35); }
 .sheet {

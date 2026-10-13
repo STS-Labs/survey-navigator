@@ -33,6 +33,11 @@
         </div>
       </div>
       <div id="thenChip" class="then" hidden><span id="thenLabel"></span><span class="then-icon" id="thenIcon"></span></div>
+      <div id="gpsHelp" class="gpshelp" hidden>
+        <div class="gh-title" id="ghTitle"></div>
+        <div class="gh-text" id="ghText"></div>
+        <div class="gh-btns"><button id="ghRetry" class="btn"></button><button id="ghPractice" class="btn"></button></div>
+      </div>
     </div>
     <button id="recenter" class="pill" hidden></button>
     <div id="toast" class="toast" hidden><span id="toastText"></span><button id="toastBtn" hidden></button></div>
@@ -45,7 +50,7 @@
       <div class="row">
         <div class="stat">
           <div id="statKm" class="big"></div>
-          <div id="statEta" class="small"></div>
+          <div class="small"><span id="gpsChip" class="gpschip none"></span> · <span id="statEta"></span></div>
         </div>
         <div class="btns">
           <button id="btnOverview" class="round" aria-label="Overview"><svg viewBox="0 0 24 24"><path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z M9 4v14 M15 6v14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>

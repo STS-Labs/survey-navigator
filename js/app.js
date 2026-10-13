@@ -4,6 +4,7 @@ import { SimCar } from './sim.js';
 import { STR, speech } from './i18n.js';
 import { arrowSvg } from './icons.js';
 
+const APP_VERSION = '1.1 (13 Oct 2026)';
 const NET_URL = 'data/tbilisi-net.json';
 const STYLE = { light: 'https://tiles.openfreemap.org/styles/liberty', dark: 'https://tiles.openfreemap.org/styles/dark' };
 const TILEJSON = 'https://tiles.openfreemap.org/planet';
@@ -39,7 +40,7 @@ let map = null, mapLoaded = null, mapReady = false, carMarker = null;
 let screen = 'home', follow = true, followTimer = null;
 let watchId = null, wakeLock = null, gpsBlocked = false;
 let sim = null, simTimer = null, simMult = 4, simClock = 0, simFed = -1, simBackup = null;
-let lastSnap = null, lastFixReal = 0, cov = null, covAt = 0, saveAt = 0, traceAt = 0;
+let lastSnap = null, lastRawFix = null, lastFixReal = 0, cov = null, covAt = 0, saveAt = 0, traceAt = 0;
 let trace = [], moving = { secs: 0, dist: 0, prev: null };
 let previewIdx = 0, toastTimer = null;
 
@@ -106,7 +107,7 @@ function renderHome(msg = '') {
   const how = `<div class="card"><b>${T.howTitle}</b><ol class="how">${T.how.map((s) => `<li>${esc(s)}</li>`).join('')}</ol><div class="note">${T.keepOn}</div></div>`;
   const err = msg ? `<div class="err">${esc(msg)}</div>` : '';
   if (!day) {
-    h.innerHTML = `<div class="wrap">${brand}<div class="card"><button class="btn primary" id="hOpen">${T.openFile}</button>${err}</div>${how}${settingsBlock()}<p class="note">${T.about}</p></div>`;
+    h.innerHTML = `<div class="wrap">${brand}<div class="card"><button class="btn primary" id="hOpen">${T.openFile}</button>${err}</div>${how}${settingsBlock()}<p class="note">${T.about} · ${T.version} ${APP_VERSION}</p></div>`;
   } else {
     const r = day.route, prog = savedProgress();
     const started = prog && prog.along > 20;
@@ -127,7 +128,7 @@ function renderHome(msg = '') {
         ${started ? `<button class="btn quiet" id="hRestart">${T.restart}</button>` : ''}
         <button class="btn quiet" id="hOpen">${T.openAnother}</button>
         ${err}
-      </div>${settingsBlock()}${how}<p class="note">${T.about}</p></div>`;
+      </div>${settingsBlock()}${how}<p class="note">${T.about} · ${T.version} ${APP_VERSION}</p></div>`;
     drawMiniMap($('miniMap'));
     $('hStart').onclick = () => startNav({});
     $('hPreview').onclick = () => openPreview(0);
@@ -351,45 +352,117 @@ function startNav({ restart = false, along = null }) {
   nav.start(along ?? nav.along);
   screen = 'nav';
   $('home').hidden = true; $('previewUi').hidden = true; $('navUi').hidden = false;
-  carMarker && (carMarker.getElement().style.display = '');
   renderWaiting(T.waitingGps);
   keepAwake();
-  ensureMap().then(() => {
+  const loaded = ensureMap();                       // creates the map and the car at once
+  carMarker.getElement().style.display = '';
+  if (!sim) startGps();                             // GPS starts with the tap, not after the map
+  loaded.then(() => {
     setFollow(true);
     if (settings.showAll) showWholeDay();
     refreshCoverage(true);
-    if (!sim) startGps();
   });
 }
 
 function stopNav() {
   stopGps(); stopSim(false); saveProgress(); saveTrace();
+  hideGpsHelp();
   if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
   renderHome();
 }
 
+/* ------------------------------------------------------------------ GPS */
+
+const UA = navigator.userAgent || '';
+const IS_IOS = /iP(hone|ad|od)/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1);
+const IS_COMPUTER = !IS_IOS && !/Android|Mobile/i.test(UA);
+const GOOD_ACC = 80;                                // metres; rougher fixes are shown but not navigated on
+const gps = { started: 0, lastAt: 0, lastGoodAt: 0, acc: null, err: 0, restartAt: 0, timer: null, problem: null };
+
 function startGps() {
   stopGps();
-  if (!('geolocation' in navigator)) { renderWaiting(T.gpsError); return; }
-  watchId = navigator.geolocation.watchPosition(onPosition, (e) => {
-    gpsBlocked = e.code === 1;
-    renderWaiting(gpsBlocked ? T.gpsDenied : T.gpsError);
-  }, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+  gpsBlocked = false;
+  if (!('geolocation' in navigator)) { showGpsHelp('nofix'); return; }
+  if (!gps.started) gps.started = Date.now();
+  // No time limit: a phone standing still may not report for a while, and that is not an error
+  watchId = navigator.geolocation.watchPosition(onPosition, onGpsError, { enableHighAccuracy: true, maximumAge: 1000 });
+  // A quick first answer (often rough) so the screen reacts while the GPS locks on
+  navigator.geolocation.getCurrentPosition(onPosition, () => {}, { enableHighAccuracy: false, maximumAge: 30000, timeout: 15000 });
+  if (!gps.timer) gps.timer = setInterval(gpsWatchdog, 3000);
 }
-function stopGps() { if (watchId != null) navigator.geolocation.clearWatch(watchId); watchId = null; }
+
+function stopGps() {
+  if (watchId != null) navigator.geolocation.clearWatch(watchId);
+  watchId = null;
+  if (gps.timer) clearInterval(gps.timer);
+  gps.timer = null;
+}
+
+function onGpsError(e) {
+  gps.err = e.code;
+  if (e.code === 1) { gpsBlocked = true; stopGps(); showGpsHelp('denied'); return; }
+  // 2 = no position available, 3 = slow: keep listening, restart the watch now and then
+  if (Date.now() - gps.restartAt > 10000) {
+    gps.restartAt = Date.now();
+    setTimeout(() => { if (screen === 'nav' && !sim && !gpsBlocked) startGps(); }, 2000);
+  }
+}
 
 function onPosition(p) {
+  if (!day || !p || !p.coords) return;
+  if (p.timestamp && Date.now() - p.timestamp > 30000) return;      // an old remembered position
   const c = p.coords;
+  gps.lastAt = Date.now(); gps.acc = c.accuracy;
+  if (c.accuracy <= GOOD_ACC) gps.lastGoodAt = gps.lastAt;
   const [x, y] = day.proj.toXY(c.latitude, c.longitude);
   const speed = Number.isFinite(c.speed) && c.speed >= 0 ? c.speed : null;
   const heading = Number.isFinite(c.heading) && c.heading >= 0 && (speed == null || speed > 0.8) ? c.heading : null;
-  handleFix({ x, y, t: p.timestamp, acc: c.accuracy, speed, heading, lat: c.latitude, lon: c.longitude });
+  handleFix({ x, y, t: p.timestamp || Date.now(), acc: c.accuracy, speed, heading, lat: c.latitude, lon: c.longitude });
+  gpsWatchdog();
+}
+
+// Decide what (if anything) the driver needs to be told about the location
+function gpsWatchdog() {
+  if (screen !== 'nav' || sim) { hideGpsHelp(); return; }
+  const now = Date.now(), running = now - gps.started;
+  let problem = null;
+  if (gpsBlocked) problem = 'denied';
+  else if (!gps.lastAt && running > 20000) problem = 'nofix';
+  else if (gps.lastAt && (!gps.lastGoodAt || now - gps.lastGoodAt > 30000) && gps.acc > GOOD_ACC && running > 15000) problem = 'coarse';
+  if (problem) showGpsHelp(problem); else hideGpsHelp();
+  renderGpsChip();
+}
+
+function showGpsHelp(kind) {
+  gps.problem = kind;
+  const where = IS_COMPUTER ? 'computer' : 'phone';
+  $('ghTitle').textContent = kind === 'coarse' ? T.gpsTitle.coarse(T.dist(gps.acc || 0)) : T.gpsTitle[kind];
+  $('ghText').textContent = T.gpsHelp[`${kind}_${where}`];
+  $('ghRetry').textContent = T.retry;
+  $('ghPractice').textContent = T.practice;
+  $('gpsHelp').hidden = false;
+  if (!nav || nav.mode === 'acquire' || !nav.lastFix) renderWaiting(kind === 'coarse' ? T.waitingPrecise(T.dist(gps.acc || 0)) : T.gpsTitle[kind]);
+}
+function hideGpsHelp() { gps.problem = null; $('gpsHelp').hidden = true; }
+$('ghRetry').onclick = () => { hideGpsHelp(); gps.started = Date.now(); gps.lastAt = 0; gps.lastGoodAt = 0; startGps(); };
+$('ghPractice').onclick = () => { hideGpsHelp(); startSim(); };
+
+function renderGpsChip() {
+  const el = $('gpsChip');
+  if (!el) return;
+  if (sim) { el.className = 'gpschip sim'; el.textContent = T.practice; return; }
+  // A phone standing still may report rarely: a reading from the last minute still counts
+  const fresh = gps.lastAt && Date.now() - gps.lastAt < 60000;
+  const acc = gps.acc;
+  el.className = 'gpschip ' + (!gps.lastAt ? 'none' : !fresh ? 'none' : acc <= 20 ? 'good' : acc <= GOOD_ACC ? 'fair' : 'poor');
+  el.textContent = !gps.lastAt ? T.gpsNone : !fresh ? T.gpsWait
+    : T.gpsAcc(acc < 1000 ? Math.round(acc) : (acc / 1000).toFixed(1) + (settings.lang === 'ka' ? ' კ' : ' k'));
 }
 
 function handleFix(fix) {
   if (!nav || screen !== 'nav') return;
   const snap = nav.update(fix);
-  lastSnap = snap;
+  lastSnap = snap; lastRawFix = fix;
   const nowReal = performance.now(), gap = lastFixReal ? nowReal - lastFixReal : 1000;
   lastFixReal = nowReal;
   // the driven track, for sending back to the office
@@ -415,7 +488,7 @@ function onEvent(e) {
   if (e.type === 'rejoin') { say(text); toast(T.rejoined); refreshCoverage(true); }
   if (e.type === 'skip') {
     say(text);
-    toast(T.skipped(T.dist(e.meters)), T.goBack, () => { if (nav.undoSkip()) render(nav.snapshot(), nav.lastFix, 300); });
+    toast(T.skipped(T.dist(e.meters)), T.goBack, () => { if (nav.undoSkip()) rerender(nav.snapshot()); });
     refreshCoverage(true);
   }
   if (e.type === 'done') { say(text); refreshCoverage(true); saveProgress(); setTimeout(openMenu, 1500); }
@@ -440,6 +513,9 @@ function renderWaiting(msg) {
   $('thenChip').hidden = true;
 }
 
+// Draw again without a new GPS reading (after a setting change, a skip, the coverage refresh)
+function rerender(snap) { if (lastRawFix) render(snap, lastRawFix, 300); }
+
 function render(snap, fix, dur) {
   const R = day.route, P = day.proj;
   // Banner
@@ -461,7 +537,8 @@ function render(snap, fix, dur) {
       dist = T.dist(Math.hypot(tp[0] - fix.x, tp[1] - fix.y)); instr = T.noWayBack; street = headline;
     }
   } else if (snap.mode === 'acquire') {
-    cls = 'wait'; instr = T.waitingGps; street = day.name;
+    cls = 'wait'; street = day.name;
+    instr = fix && fix.acc > GOOD_ACC ? T.waitingPrecise(T.dist(fix.acc)) : T.waitingGps;
   } else if (snap.next) {
     const m = snap.next.m;
     icon = arrowSvg(m.kind, m.a, m.exit); dist = T.dist(snap.next.dist); instr = kindText(m); street = streetText(m);
@@ -523,6 +600,7 @@ function render(snap, fix, dur) {
   let eta = T.eta(Math.floor(left / 3600), Math.round((left % 3600) / 60));
   if (cov && cov.missed.length) eta += ' · ' + T.missedSummary(cov.missed.length, T.dist(cov.missedMeters));
   $('statEta').textContent = eta;
+  renderGpsChip();
 }
 
 function refreshCoverage(now = false) {
@@ -535,7 +613,7 @@ function refreshCoverage(now = false) {
     map.getSource('missed').setData({ type: 'Feature', geometry: { type: 'MultiLineString', coordinates: lines }, properties: {} });
   }
   $('barMissed').innerHTML = cov.missed.map(([a, b]) => `<i style="left:${(a / R.total * 100).toFixed(2)}%;width:${((b - a) / R.total * 100).toFixed(2)}%"></i>`).join('');
-  if (now && lastSnap) render(lastSnap, nav.lastFix, 300);
+  if (now && lastSnap) rerender(lastSnap);
 }
 
 function showWholeDay() {
@@ -601,7 +679,7 @@ function openMenu() {
     <button class="item danger" id="mEnd">${T.endNav}</button>
     <button class="item" id="mClose">${T.close}</button>`;
   sh.hidden = false; $('sheetBack').hidden = false;
-  wireSettings(sh, () => { renderMute(); openMenu(); if (lastSnap) render(lastSnap, nav.lastFix, 300); });
+  wireSettings(sh, () => { renderMute(); openMenu(); if (lastSnap) rerender(lastSnap); });
   $('mSkip').onclick = () => { const from = nav.along, to = nav.jump(1); closeMenu(); toast(T.jumped(T.dist(to - from))); refreshCoverage(true); };
   $('mBack').onclick = () => { nav.jump(-1); closeMenu(); refreshCoverage(true); };
   $('mHere').onclick = () => { const moved = nav.continueHere(); closeMenu(); if (moved != null && moved > 10) toast(T.jumped(T.dist(moved))); refreshCoverage(true); };
@@ -724,6 +802,7 @@ function startSim() {
   trace = [];
   sim = new SimCar(nav, { speed: 9, noise: 3, seed: (Date.now() & 0xffff) + 1, startAlong: nav.along });
   simClock = 0; simFed = -1;
+  hideGpsHelp();
   $('simBar').hidden = false;
   renderSimBar(); applyPadding();
   simTimer = setInterval(() => {
