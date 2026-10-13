@@ -1,0 +1,21 @@
+// Prepare a GPX the way the phone does and print what came out (no pass/fail; numbers to read).
+import { readFileSync } from 'node:fs';
+import { prepare } from '../js/core.js';
+const [gpxPath, netPath] = process.argv.slice(2);
+const t0 = performance.now();
+const netDoc = JSON.parse(readFileSync(netPath, 'utf8'));
+const t1 = performance.now();
+const { route, net } = prepare(readFileSync(gpxPath, 'utf8'), netDoc);
+const t2 = performance.now();
+console.log(`network json parse ${(t1 - t0).toFixed(0)} ms, prepare ${(t2 - t1).toFixed(0)} ms`);
+console.log(`network kept: ${net.nodeCount} nodes, ${net.segCount} segments, ${net.restr.size} restricted junctions`);
+console.log(`route: ${route.X.length} vertices, ${(route.total / 1000).toFixed(2)} km, matched ${(route.matched * 100).toFixed(2)}% of length`);
+let unknown = 0; for (const h of route.half) if (h < 0) unknown++;
+console.log(`route segments without a street: ${unknown}`);
+const kinds = {}; for (const m of route.maneuvers) kinds[m.kind] = (kinds[m.kind] || 0) + 1;
+console.log('instructions:', route.maneuvers.length, kinds);
+const gaps = route.maneuvers.slice(1).map((m, k) => m.along - route.maneuvers[k].along).sort((a, b) => a - b);
+console.log('gap between instructions: p10 %d m, median %d m, p90 %d m', gaps[Math.floor(gaps.length * .1)] | 0, gaps[gaps.length >> 1] | 0, gaps[Math.floor(gaps.length * .9)] | 0);
+const noName = route.maneuvers.filter(m => !m.name && !m.ref && m.kind !== 'arrive').length;
+console.log('instructions with no street name:', noName);
+for (const m of route.maneuvers.slice(0, 25)) console.log(String((m.along / 1000).toFixed(3)).padStart(7), m.kind.padEnd(12), String(Math.round(m.a)).padStart(5), m.exit ? 'exit ' + m.exit : '', m.name, m.en ? '(' + m.en + ')' : '');
