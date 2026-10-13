@@ -602,17 +602,23 @@ export function detectManeuvers(path, net, { arrive = true } = {}) {
         say = turnKind(a);                                          // the named street carries on elsewhere
       }
     }
-    if (say) out.push({ i, kind: say, a, deliberate: fwd.some((o) => o.legal && Math.abs(o.ang) + 15 < Math.abs(a)) });
+    if (say) out.push({ i, kind: say, a, inB, deliberate: fwd.some((o) => o.legal && Math.abs(o.ang) + 15 < Math.abs(a)) });
   }
   out.sort((p, q) => p.i - q.i);
 
-  // Two same-side turns a few metres apart (through the gap of a divided road) are one U-turn
+  // Two same-side turns a few metres apart (through the gap of a divided road) are one U-turn, but only
+  // if the car then really drives back the way it came (not a hook round a corner into another street)
+  const drivesBack = (first, second) => {
+    if (first.inB == null) return false;
+    const p = [path.X[second.i], path.Y[second.i]], q = pointAt(path, Math.min(path.total, A[second.i] + 35));
+    return Math.abs(angleDiff(first.inB + 180, bearing(p[0], p[1], q[0], q[1]))) <= 35;
+  };
   const merged = [];
   for (const m of out) {
     const last = merged[merged.length - 1];
     if (last && A[m.i] - A[last.i] < 30 && last.kind !== 'roundabout' && m.kind !== 'roundabout' && m.kind !== 'uturn'
         && last.kind !== 'uturn' && Math.sign(last.a) === Math.sign(m.a) && Math.abs(last.a) >= 60 && Math.abs(m.a) >= 60
-        && Math.abs(last.a + m.a) >= 150 && Math.abs(last.a + m.a) <= 215) {
+        && Math.abs(last.a + m.a) >= 150 && Math.abs(last.a + m.a) <= 215 && drivesBack(last, m)) {
       last.kind = 'uturn'; last.a = last.a + m.a; last.mergedTo = m.i;
       continue;
     }
@@ -641,22 +647,23 @@ export function detectManeuvers(path, net, { arrive = true } = {}) {
 // Edge-based Dijkstra on legal moves: one-way streets, turn restrictions, U-turns discouraged.
 // `goals` maps route half-edges the car may finish on to an extra cost (re-driving or skipping a bit);
 // a single half-edge number is also accepted.
-export function findWayBack(net, proj, car, heading, goals, maxCost = 8000) {
+// `starts` (optional) replaces the snapped car with given start half-edges: [{h, remain, x, y}].
+export function findWayBack(net, proj, car, heading, goals, maxCost = 8000, starts = null, uturn = { street: 600, deadEnd: 200 }, avoid = { service: 1.6, minor: 4 }) {
   if (typeof goals === 'number') goals = new Map([[goals, { extra: 0 }]]);
-  const s0 = net.snapCar(car[0], car[1], heading);
+  const s0 = starts ? starts[0] : net.snapCar(car[0], car[1], heading);
   if (!s0) return null;
   const nH = net.segCount * 2;
   const dist = new Float64Array(nH).fill(Infinity), prev = new Int32Array(nH).fill(-1);
   const heap = new Heap();
   const turnCost = (h1, h2) => {
-    if (h2 === (h1 ^ 1)) return net.deg[net.head(h1)] <= 1 ? 200 : 600;   // turning round: dead end, else rather a block
+    if (h2 === (h1 ^ 1)) return net.deg[net.head(h1)] <= 1 ? uturn.deadEnd : uturn.street;   // turning round: rather a block
     const a = angleDiff(net.halfBearing(h1), net.halfBearing(h2)), m = Math.abs(a);
     if (m < 30) return 0;
     if (m > 120) return 60;
     return a < 0 ? 25 : 10;
   };
-  const cost = (h) => net.sLen[h >> 1] * (net.isMinor(h) ? 4 : net.isService(h) ? 1.6 : 1);
-  dist[s0.h] = s0.remain; heap.push(s0.remain, s0.h);
+  const cost = (h) => net.sLen[h >> 1] * (net.isMinor(h) ? avoid.minor : net.isService(h) ? avoid.service : 1);
+  for (const st of starts || [s0]) { if (st.remain < dist[st.h]) { dist[st.h] = st.remain; heap.push(st.remain, st.h); } }
   let found = -1, best = Infinity;
   while (heap.size) {
     const h = heap.pop(), c = heap.lastKey;
@@ -675,9 +682,10 @@ export function findWayBack(net, proj, car, heading, goals, maxCost = 8000) {
   }
   if (found < 0) return null;
   const halves = [];
-  for (let h = found; h >= 0; h = prev[h]) { halves.push(h); if (h === s0.h) break; }
+  for (let h = found; h >= 0; h = prev[h]) halves.push(h);
   halves.reverse();
-  const path = pathFromHalves(net, proj, [s0.x, s0.y], halves);
+  const first = (starts || [s0]).find((st) => st.h === halves[0]) || s0;
+  const path = pathFromHalves(net, proj, [first.x, first.y], halves);
   path.maneuvers = detectManeuvers(path, net, { arrive: false });
   path.goal = goals.get(found);
   return path;

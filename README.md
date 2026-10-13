@@ -46,6 +46,16 @@ uv run --with osmium python -I tools/build_network.py <georgia-latest.osm.pbf> d
 
 Get the extract from https://download.geofabrik.de/europe/georgia-latest.osm.pbf.
 
+## Making a test route
+
+```bash
+node tools/make_route.mjs places.json test.gpx
+```
+
+`places.json` lists the stops in order: `{"name": "...", "points": [{"name": "...", "lat": 41.72, "lon": 44.71, "street": "optional OSM street name"}]}`.
+Each stop is placed on the nearest drivable street (or on the named one), and the legs between stops follow
+legal turns on real streets: no U-turns in the street, service roads and yards only where a stop is.
+
 ## Checks
 
 ```bash
