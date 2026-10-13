@@ -1,6 +1,6 @@
 // Offline support: the app and the street network are kept on the phone, and so is every map tile it
 // has shown (plus the tiles around the loaded route), so a dead spot in the city does not stop navigation.
-const APP = 'sn-app-2';
+const APP = 'sn-app-3';
 const MAP = 'sn-map-1';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'js/app.js', 'js/core.js', 'js/sim.js', 'js/i18n.js', 'js/icons.js',
@@ -24,7 +24,9 @@ function appFile(req) {
     let settled = false;
     const fallback = () => caches.match(req, { ignoreSearch: true }).then((hit) => hit || fetch(req));
     const timer = setTimeout(() => { if (!settled) { settled = true; resolve(fallback()); } }, 4000);
-    fetch(req).then((r) => {
+    // Always ask the server whether the file changed (the browser's own cache could hand back an old copy)
+    const fresh = req.mode === 'navigate' ? fetch(req.url, { cache: 'no-cache' }) : fetch(new Request(req, { cache: 'no-cache' }));
+    fresh.then((r) => {
       if (r.ok) { const copy = r.clone(); caches.open(APP).then((c) => c.put(req, copy)); }
       if (!settled) { settled = true; clearTimeout(timer); resolve(r); }
     }).catch(() => { if (!settled) { settled = true; clearTimeout(timer); resolve(fallback()); } });
