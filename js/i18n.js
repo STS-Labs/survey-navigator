@@ -5,7 +5,7 @@ const km = (m, unitM, unitKm) => (m < 950 ? `${Math.max(0, Math.round(m / 10) * 
 
 export const STR = {
   en: {
-    appName: 'Survey Navigator',
+    appName: 'STS NAV',
     tagline: 'Turn-by-turn for street-coverage routes',
     chooseDay: 'Choose day',
     dayNumber: (n) => `Day ${n}`,
@@ -100,12 +100,17 @@ export const STR = {
     pauseNav: 'Pause navigation', resumeNav: 'Continue navigation', pausedTitle: 'Navigation paused',
     pausedText: 'GPS is off: nothing is recorded during the pause. Tap Continue navigation when you are ready.',
     recenterLabel: 'Back to the car',
-    waitingPrecise: (a) => `Waiting for precise GPS (now ±${a})`,
+    waitingPrecise: () => 'Waiting for precise GPS…',
     version: 'Version',
     about: 'Street data © OpenStreetMap contributors.',
+    // night design (1.5)
+    tagOff: 'Off the route', tagStart: 'To the start', tagResume: 'Back to where you stopped', tagPaused: 'Paused',
+    skipShort: 'Skip',
+    km: (v) => `${v} km`,
+    timeLeft: (h, m) => (h ? `${h} h ${m} min` : `${m} min`),
   },
   ka: {
-    appName: 'Survey Navigator',
+    appName: 'STS NAV',
     tagline: 'ნავიგაცია ქუჩების სრული აღწერის მარშრუტებისთვის',
     chooseDay: 'დღის არჩევა',
     dayNumber: (n) => `დღე ${n}`,
@@ -201,9 +206,14 @@ export const STR = {
     pauseNav: 'ნავიგაციის პაუზა', resumeNav: 'ნავიგაციის გაგრძელება', pausedTitle: 'ნავიგაცია დაპაუზებულია',
     pausedText: 'GPS გამორთულია: პაუზის დროს არაფერი იწერება. როცა მზად იქნებით, დააჭირეთ „ნავიგაციის გაგრძელებას“.',
     recenterLabel: 'მანქანასთან დაბრუნება',
-    waitingPrecise: (a) => `ზუსტი GPS-ის მოლოდინი (ახლა ±${a})`,
+    waitingPrecise: () => 'ზუსტი GPS-ის მოლოდინი…',
     version: 'ვერსია',
     about: 'ქუჩების მონაცემები © OpenStreetMap contributors.',
+    // night design (1.5)
+    tagOff: 'მარშრუტს გადაუხვიეთ', tagStart: 'დასაწყისისკენ', tagResume: 'გაჩერების ადგილისკენ', tagPaused: 'პაუზა',
+    skipShort: 'გამოტოვება',
+    km: (v) => `${v} კმ`,
+    timeLeft: (h, m) => (h ? `${h} სთ ${m} წთ` : `${m} წთ`),
   },
 };
 

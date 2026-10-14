@@ -1,4 +1,4 @@
-# Survey Navigator
+# STS NAV (Survey Navigator)
 
 Turn-by-turn navigation on an iPhone for street-coverage routes: the kind of GPX a survey car follows
 when it has to drive every street of an area, passing the same junctions several times.
@@ -11,7 +11,8 @@ turn is missed, and keeps a record of what was really driven.
 ## For the driver
 
 1. Open the app's web address in Safari, then Share → Add to Home Screen.
-2. Open the app: the days are listed straight away. Tap the day (**დღე 1** to **დღე 6**); its GPX loads.
+2. Open the app: the days are shown straight away as tiles with their length (and how far this phone got).
+   Tap the day (**დღე 1** to **დღე 6**); its GPX loads.
    Another route can still be opened from a file (**მარშრუტის ფაილის გახსნა (GPX)**).
 3. Mount the phone, connect the charger, tap **ნავიგაციის დაწყება** (start navigation).
    iPhone setting: Display & Brightness → Auto-Lock → Never.
@@ -22,14 +23,27 @@ The six supplied daily routes are bundled unchanged in `data/routes/`. They are 
 after a successful online service-worker installation, so the day picker also works offline once
 that download is complete. Each GPX keeps its own saved progress; choosing another day does not clear it.
 
-On the map: **blue** = the road ahead (bold for the next 300 m), white arrow = the next turn,
-**orange** = the way back after a missed turn, **red dashes** = stretches missed so far.
-The map can be moved and zoomed with the fingers at any time. The re-centre button (bottom left, blue
-while the map is moved away) brings it back to the car; it also comes back by itself after 20 seconds.
+The look is the night design approved in Figma on 14 Oct 2026 (file "Survey Navigator", page
+"Design (night)"): navy map, glass cards, violet accent, fonts Inter (numbers, Latin) and Noto Sans
+Georgian, both kept in `fonts/` so they work offline.
 
-Menu: pause navigation (a break: GPS off, nothing recorded; continue when ready), skip to the next turn
-(closed street), go back one turn, continue from where I am, the missed list, send missed stretches / the
-driven track as GPX, the whole day on the map, practice drive (simulation), stop.
+The driving screen: the instruction card top left (arrow, distance, what to do, street), menu and sound
+top right, and at the bottom a slim line with the time left (green), km left and the time the day ends
+(violet), a GPS dot (green good, amber rough, red poor, grey none) and the progress line (red marks =
+missed stretches). Under the card: **შემდეგ** (the turn right after this one) and **გამოტოვება**, which
+skips the next turn (closed street): the stretch goes on the missed list and the message offers the way back.
+The card is orange with a tag after leaving the route, blue on the way to the start or back to where the
+drive stopped, grey while waiting for GPS or paused.
+
+On the map: **blue to violet** = the next 320 m, dimmer violet = the road after that, white arrow = the next
+turn, **orange** = the way back after a missed turn (**blue** on the way to the start or to where the drive
+stopped), **red dashes** = stretches missed so far. The map can be moved and zoomed with the fingers at any
+time; the violet re-centre button (bottom right, shown only while the map is moved away) brings it back to
+the car, and it also comes back by itself after 20 seconds.
+
+Menu: pause navigation (a break: GPS off, nothing recorded; continue when ready), continue from where I am,
+go back one turn, the missed list, send missed stretches / the driven track as GPX, the whole day on the map,
+practice drive (simulation), stop.
 
 ## How it works
 
@@ -87,3 +101,4 @@ app on an `https://` address for GPS (any static host works; nothing runs on a s
 
 Street data © OpenStreetMap contributors, available under the Open Database License (ODbL).
 Map tiles: OpenFreeMap, OpenMapTiles. Map library: MapLibre GL JS (BSD-3-Clause, `vendor/`).
+Fonts: Inter and Noto Sans Georgian (SIL Open Font License 1.1, `fonts/`).

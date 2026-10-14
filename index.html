@@ -3,16 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#0b6e4f">
+<meta name="theme-color" content="#0c0e15">
+<meta name="color-scheme" content="dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Navigator">
-<meta name="description" content="Turn-by-turn navigation for street-coverage survey routes">
-<title>Survey Navigator</title>
+<meta name="apple-mobile-web-app-title" content="STS NAV">
+<meta name="description" content="STS NAV: turn-by-turn navigation for street-coverage survey routes">
+<title>STS NAV</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="preload" href="fonts/noto-sans-georgian.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="vendor/maplibre-gl-4.7.1/maplibre-gl.css">
 <link rel="stylesheet" href="css/app.css">
 <script src="vendor/maplibre-gl-4.7.1/maplibre-gl.js" defer></script>
@@ -23,44 +26,49 @@
 
   <!-- Driving view -->
   <section id="navUi" hidden>
+    <div class="fade" aria-hidden="true"></div>
     <div class="top" id="top">
-      <div id="banner" class="banner wait">
+      <div id="banner" class="banner glass tone-grey">
         <div class="b-icon" id="bIcon"></div>
         <div class="b-text">
+          <div class="b-tag" id="bTag" hidden><i></i><span id="bTagText"></span></div>
           <div class="b-dist" id="bDist"></div>
           <div class="b-instr" id="bInstr"></div>
           <div class="b-street" id="bStreet"></div>
         </div>
       </div>
-      <div id="thenChip" class="then" hidden><span id="thenLabel"></span><span class="then-icon" id="thenIcon"></span></div>
-      <div id="gpsHelp" class="gpshelp" hidden>
-        <div class="gh-title" id="ghTitle"></div>
-        <div class="gh-text" id="ghText"></div>
-        <div class="gh-btns"><button id="ghRetry" class="btn"></button><button id="ghPractice" class="btn"></button></div>
+      <div class="pills">
+        <div id="thenChip" class="pill glass then" hidden><span id="thenLabel"></span><span class="then-icon" id="thenIcon"></span></div>
+        <button id="btnSkip" class="pill glass skip" hidden><span class="skip-icon" id="skipIcon"></span><span id="skipLabel"></span></button>
       </div>
-      <div id="pauseCard" class="pausecard" hidden>
+      <div id="gpsHelp" class="glass gpshelp" hidden>
+        <div class="gh-head"><span class="gh-icon" id="ghIcon"></span><div class="gh-title" id="ghTitle"></div></div>
+        <div class="gh-text" id="ghText"></div>
+        <div class="gh-btns"><button id="ghRetry" class="btn primary"></button><button id="ghPractice" class="btn"></button></div>
+      </div>
+      <div id="pauseCard" class="glass pausecard" hidden>
         <div class="pc-text" id="pcText"></div>
         <button id="pcResume" class="btn primary"></button>
       </div>
     </div>
-    <div id="toast" class="toast" hidden><span id="toastText"></span><button id="toastBtn" hidden></button></div>
+    <div class="side">
+      <button id="btnMenu" class="round glass" aria-label="Menu"></button>
+      <button id="btnMute" class="round glass" aria-label="Sound"></button>
+    </div>
+    <div class="dock" id="dock">
+      <button id="btnRecenter" class="round accent" hidden aria-label="Back to the car"></button>
+      <div id="toast" class="glass toast" hidden><span id="toastText"></span><button id="toastBtn" hidden></button></div>
+      <div id="simBar" class="glass simbar" hidden>
+        <div class="sim-head"><span id="simTitle"></span><div class="seg3"><button data-mult="1">1×</button><button data-mult="4">4×</button><button data-mult="10">10×</button></div></div>
+        <div class="sim-btns"><button id="simMiss"></button><button id="simStop"></button></div>
+      </div>
+    </div>
     <footer class="bottom" id="bottom">
-      <div id="simBar" class="simbar" hidden>
-        <button data-mult="1">1×</button><button data-mult="4">4×</button><button data-mult="10">10×</button>
-        <button id="simMiss"></button><button id="simStop"></button>
+      <div class="status">
+        <div class="st-line"><span id="stTime" class="st-time"></span><i>•</i><span id="stKm" class="st-km"></span><i>•</i><span id="stEnd" class="st-end"></span></div>
+        <span id="gpsChip" class="gpschip none">GPS</span>
       </div>
       <div class="bar"><div id="barFill"></div><div id="barMissed"></div></div>
-      <div class="row">
-        <div class="stat">
-          <div id="statKm" class="big"></div>
-          <div class="small"><span id="gpsChip" class="gpschip none"></span> · <span id="statEta"></span></div>
-        </div>
-        <div class="btns">
-          <button id="btnRecenter" class="round" aria-label="Back to the car"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.4" fill="currentColor"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
-          <button id="btnMute" class="round" aria-label="Sound"></button>
-          <button id="btnMenu" class="round" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
-        </div>
-      </div>
     </footer>
   </section>
 

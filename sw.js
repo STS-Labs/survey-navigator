@@ -1,6 +1,6 @@
 // Offline support: the app and the street network are kept on the phone, and so is every map tile it
 // has shown (plus the tiles around the loaded route), so a dead spot in the city does not stop navigation.
-const APP = 'sn-app-7';
+const APP = 'sn-app-8';
 const MAP = 'sn-map-1';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'js/app.js', 'js/core.js', 'js/sim.js', 'js/i18n.js', 'js/icons.js',
@@ -13,7 +13,8 @@ const SHELL = [
   'data/routes/day_05_nav.gpx',
   'data/routes/day_06_nav.gpx',
   'data/routes/zuka-testdrive.gpx',
-  'data/tbilisi-net.json', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
+  'data/tbilisi-net.json', 'manifest.webmanifest', 'icons/logo.png', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
+  'fonts/inter-latin.woff2', 'fonts/noto-sans-georgian.woff2',
 ];
 
 self.addEventListener('install', (e) => {

@@ -1,13 +1,13 @@
-// Survey Navigator: the phone app around js/core.js (screens, map, GPS, voice, saving progress).
+// STS NAV (Survey Navigator): the phone app around js/core.js (screens, map, GPS, voice, saving progress).
 import { prepare, Navigator, slice, pointAt, hashText, bearing, angleDiff } from './core.js';
 import { SimCar } from './sim.js';
 import { STR, speech } from './i18n.js';
-import { arrowSvg } from './icons.js';
+import { arrowSvg, UI, CAR_SVG } from './icons.js';
 import { SURVEY_DAYS, loadSurveyDay } from './days.js';
 
-const APP_VERSION = '1.4 (14 Oct 2026)';
+const APP_VERSION = '1.5 (14 Oct 2026)';
 const NET_URL = 'data/tbilisi-net.json';
-const STYLE = { light: 'https://tiles.openfreemap.org/styles/liberty', dark: 'https://tiles.openfreemap.org/styles/dark' };
+const STYLE = 'https://tiles.openfreemap.org/styles/liberty';      // recoloured to the night design on load
 const TILEJSON = 'https://tiles.openfreemap.org/planet';
 const NEAR = 320, AHEAD = 1500;          // metres of route drawn bold / drawn at all ahead of the car
 
@@ -22,13 +22,12 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
   del(k) { try { localStorage.removeItem(k); } catch { /* private mode */ } },
 };
-const K = { route: 'sn1.route', settings: 'sn1.settings', prog: (h) => 'sn1.prog.' + h, trace: (h) => 'sn1.trace.' + h };
+const K = { route: 'sn1.route', settings: 'sn1.settings', prog: (h) => 'sn1.prog.' + h, trace: (h) => 'sn1.trace.' + h, dayMeta: 'sn1.daymeta' };
 
 // Screens in Georgian, spoken instructions in English (there is no choice for either)
 const settings = Object.assign({ showAll: false, muted: false }, store.get(K.settings, {}), { lang: 'ka', voice: 'en' });
 const saveSettings = () => store.set(K.settings, settings);
 const T = STR.ka;
-const dark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
 
 /* ------------------------------------------------------------------ app state */
 
@@ -75,66 +74,118 @@ function makeNav(restore = true) {
 
 /* ------------------------------------------------------------------ start screen */
 
+const brandHtml = () => `<header class="brand"><img src="icons/logo.png" alt="STS NAV" width="172" height="99"><p>${T.tagline}</p></header>`;
+const errHtml = (msg) => (msg ? `<div class="errnote" role="alert"><b>!</b><span>${esc(msg)}</span></div>` : '');
+const loadingHtml = (text) => `<div class="wrap">${brandHtml()}<div class="loading" role="status"><span class="spinner"></span><span>${text}</span></div></div>`;
+
 function renderHome(msg = '') {
   screen = 'home';
   const h = $('home');
   h.hidden = false; $('navUi').hidden = true;
   if (!day) dayPickerOpen = true;                    // nothing loaded: the days are the first thing to see
-  const brand = `<div class="brand"><img src="icons/icon.svg" alt=""><div><h1>${T.appName}</h1><p>${T.tagline}</p></div></div>`;
-  const err = msg ? `<div class="err" role="alert">${esc(msg)}</div>` : '';
-  const dayPicker = dayPickerMarkup();
-  const foot = `<p class="note">${T.about} · ${T.version} ${APP_VERSION}</p>`;
+  const foot = `<p class="credits">${T.about} · ${T.version} ${APP_VERSION}</p>`;
+  const picker = `<section id="dayChoices" ${dayPickerOpen ? '' : 'hidden'}><h1 class="title">${T.chooseDay}</h1>${dayTiles()}</section>`;
   if (!day) {
-    h.innerHTML = `<div class="wrap">${brand}<div class="card">${dayPicker}<button class="btn" id="hOpen">${T.openFile}</button>${err}</div>${foot}</div>`;
+    h.innerHTML = `<div class="wrap">${brandHtml()}${errHtml(msg)}${picker}<button class="btn quiet" id="hOpen">${T.openFile}</button>${foot}</div>`;
   } else {
     const r = day.route, prog = savedProgress();
     const started = prog && prog.along > 20;
     let progHtml = '';
     if (started) {
       const n = makeNav(), c = n.coverage();
-      progHtml = `<div class="prog meta">${T.progress((prog.along / 1000).toFixed(1), (r.total / 1000).toFixed(1), Math.round(prog.along / r.total * 100))}<br>${T.missedSummary(c.missed.length, T.dist(c.missedMeters))}</div>`;
+      progHtml = `<div><div class="prog-line">${T.progress((prog.along / 1000).toFixed(1), (r.total / 1000).toFixed(1), Math.round(prog.along / r.total * 100))}</div>
+        <div class="prog-missed${c.missed.length ? '' : ' none'}">${T.missedSummary(c.missed.length, T.dist(c.missedMeters))}</div></div>`;
     }
-    h.innerHTML = `<div class="wrap">${brand}
-      <div class="card">
-        <h2>${esc(day.name)}</h2>
-        <div class="meta">${T.stats((r.total / 1000).toFixed(1), r.maneuvers.length - 1)}</div>
-        <div class="meta">${day.net ? T.matched((r.matched * 100).toFixed(1)) : `<span class="warn">${T.notMatched}</span>`}</div>
+    h.innerHTML = `<div class="wrap">${brandHtml()}${errHtml(msg)}
+      <div class="daycard">
+        <div><h2>${esc(day.name)}</h2>
+          <p class="meta">${T.stats((r.total / 1000).toFixed(1), r.maneuvers.length - 1)}</p>
+          <p class="meta small">${day.net ? T.matched((r.matched * 100).toFixed(1)) : `<span class="warn">${T.notMatched}</span>`}</p></div>
         <canvas class="mini-map" id="miniMap"></canvas>
         ${progHtml}
         <button class="btn primary" id="hStart">${started ? T.continueNav : T.start}</button>
-        ${started ? `<button class="btn quiet" id="hRestart">${T.restart}</button>` : ''}
-        ${dayPicker}
+        ${started ? `<button class="btn" id="hRestart">${T.restart}</button>` : ''}
+        <button class="btn" id="hChooseDay" aria-expanded="${dayPickerOpen}" aria-controls="dayChoices">${T.chooseDay}</button>
         <button class="btn quiet" id="hOpen">${T.openAnother}</button>
-        ${err}
-      </div>${foot}</div>`;
+      </div>
+      ${picker}${foot}</div>`;
     drawMiniMap($('miniMap'));
     $('hStart').onclick = () => startNav({});
     if (started) $('hRestart').onclick = () => { if (confirm(T.restartConfirm)) startNav({ restart: true }); };
+    $('hChooseDay').onclick = () => {
+      dayPickerOpen = !dayPickerOpen;
+      $('dayChoices').hidden = !dayPickerOpen;
+      $('hChooseDay').setAttribute('aria-expanded', String(dayPickerOpen));
+      if (dayPickerOpen) $('dayChoices').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
   }
   $('hOpen').onclick = () => $('file').click();
-  $('hChooseDay').onclick = () => {
-    dayPickerOpen = !dayPickerOpen;
-    $('dayChoices').hidden = !dayPickerOpen;
-    $('hChooseDay').setAttribute('aria-expanded', String(dayPickerOpen));
-  };
   h.querySelectorAll('[data-day]').forEach((button) => {
     button.onclick = () => chooseSurveyDay(Number(button.dataset.day));
   });
+  fillDayTiles();
 }
 
-function dayPickerMarkup() {
-  return `<button class="btn ${day ? '' : 'primary'}" id="hChooseDay" aria-expanded="${dayPickerOpen}" aria-controls="dayChoices">${T.chooseDay}</button>
-    <div class="day-picker" id="dayChoices" role="group" aria-label="${T.chooseDay}" ${dayPickerOpen ? '' : 'hidden'}>
-      ${SURVEY_DAYS.map(({ number, name }) => `<button class="btn day-option" data-day="${number}">${name ? esc(name) : T.dayNumber(number)}</button>`).join('')}
-    </div>`;
+// The bundled days as tiles: length, and how far this phone got on each
+function dayTiles() {
+  const meta = store.get(K.dayMeta, {});
+  return `<div class="days">${SURVEY_DAYS.map(({ number, name }) => {
+    const m = meta[number];
+    return `<button class="tile${day && m && m.hash === day.hash ? ' current' : ''}" data-day="${number}">
+      <span class="t-name">${name ? esc(name) : T.dayNumber(number)}</span>${tileInfo(m)}</button>`;
+  }).join('')}</div>`;
+}
+
+function tileInfo(m) {
+  if (!m) return '<span class="t-km"></span>';
+  const prog = store.get(K.prog(m.hash), null);
+  const along = prog && prog.along > 20 ? prog.along : 0;
+  const pct = Math.min(100, Math.round(along / m.total * 100));
+  return `<span class="t-km">${T.km((m.total / 1000).toFixed(1))}</span>`
+    + (along ? `<span class="t-prog"><span class="tb"><i style="width:${pct}%"></i></span><span>${pct}%</span></span>` : '');
+}
+
+// Lengths come from the app's own reading of each day (the files also carry other lines), worked out
+// once per file version in the background and remembered on this phone
+let tilesChecked = false;
+async function fillDayTiles() {
+  if (tilesChecked) return;
+  tilesChecked = true;
+  const meta = store.get(K.dayMeta, {});
+  for (const { number } of SURVEY_DAYS) {
+    try {
+      const text = await loadSurveyDay(number);
+      const hash = hashText(text);
+      if (!meta[number] || meta[number].hash !== hash) {
+        const netDoc = await loadNetwork();
+        if (!netDoc) { tilesChecked = false; return; }
+        meta[number] = { hash, total: Math.round(prepare(text, netDoc).route.total) };
+        store.set(K.dayMeta, meta);
+      }
+      const tile = document.querySelector(`.tile[data-day="${number}"]`);
+      if (tile) {
+        tile.querySelectorAll('.t-km, .t-prog').forEach((el) => el.remove());
+        tile.insertAdjacentHTML('beforeend', tileInfo(meta[number]));
+        tile.classList.toggle('current', !!(day && meta[number].hash === day.hash));
+      }
+    } catch (e) { console.warn('day', number, e); }
+    await new Promise((res) => setTimeout(res, 0));
+  }
+}
+
+function rememberDay(number) {
+  const meta = store.get(K.dayMeta, {});
+  meta[number] = { hash: day.hash, total: Math.round(day.route.total) };
+  store.set(K.dayMeta, meta);
 }
 
 async function chooseSurveyDay(number) {
   const name = SURVEY_DAYS.find((entry) => entry.number === number)?.name;
-  $('home').innerHTML = `<div class="wrap"><div class="card" role="status"><span class="spinner"></span>${name ? `${T.loading} ${esc(name)}` : T.loadingDay(number)}</div></div>`;
+  $('home').innerHTML = loadingHtml(name ? `${T.loading} ${esc(name)}` : T.loadingDay(number));
   try {
     const text = await loadSurveyDay(number);
     await openDay(text, true, name || T.dayNumber(number));      // the day's own name, not the English one in the file
+    rememberDay(number);
     dayPickerOpen = false;
     renderHome();
   } catch (e) {
@@ -151,28 +202,35 @@ function drawMiniMap(cv) {
   g.scale(dpr, dpr);
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (let i = 0; i < r.X.length; i++) { x0 = Math.min(x0, r.X[i]); x1 = Math.max(x1, r.X[i]); y0 = Math.min(y0, r.Y[i]); y1 = Math.max(y1, r.Y[i]); }
-  const s = Math.min((w - 20) / (x1 - x0 || 1), (hgt - 20) / (y1 - y0 || 1));
+  const s = Math.min((w - 24) / (x1 - x0 || 1), (hgt - 24) / (y1 - y0 || 1));
   const ox = (w - (x1 - x0) * s) / 2, oy = (hgt - (y1 - y0) * s) / 2;
   const P = (i) => [ox + (r.X[i] - x0) * s, hgt - (oy + (r.Y[i] - y0) * s)];
-  g.lineWidth = 1.6; g.lineJoin = 'round'; g.strokeStyle = dark ? '#5fd3a8' : '#0b6e4f';
-  g.beginPath();
-  for (let i = 0; i < r.X.length; i++) { const [x, y] = P(i); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
-  g.stroke();
-  const prog = savedProgress();
-  if (prog && prog.along > 0) {
-    g.strokeStyle = dark ? '#9ca3af' : '#94a3b8'; g.lineWidth = 3; g.beginPath();
-    for (let i = 0; i < r.X.length && r.along[i] <= prog.along; i++) { const [x, y] = P(i); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+  // the route from blue (start) to violet (end), as on the driving map
+  const A = [0x3d, 0x7b, 0xff], B = [0x8b, 0x5c, 0xf6], parts = 48;
+  g.lineWidth = 1.8; g.lineJoin = 'round'; g.lineCap = 'round';
+  let i = 0;
+  for (let k = 1; k <= parts; k++) {
+    const end = r.total * k / parts, t = (k - 0.5) / parts;
+    g.strokeStyle = `rgb(${A.map((a, j) => Math.round(a + (B[j] - a) * t)).join(',')})`;
+    g.beginPath(); let [x, y] = P(i); g.moveTo(x, y);
+    while (i < r.X.length - 1 && r.along[i] < end) { i++; [x, y] = P(i); g.lineTo(x, y); }
     g.stroke();
   }
-  const dot = (i, col) => { const [x, y] = P(i); g.fillStyle = col; g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke(); };
-  dot(r.X.length - 1, '#dc2626'); dot(0, '#1d4ed8');
+  const prog = savedProgress();
+  if (prog && prog.along > 0) {
+    g.strokeStyle = '#6c7285'; g.lineWidth = 3; g.beginPath();
+    for (let j = 0; j < r.X.length && r.along[j] <= prog.along; j++) { const [x, y] = P(j); if (j) g.lineTo(x, y); else g.moveTo(x, y); }
+    g.stroke();
+  }
+  const dot = (j, col) => { const [x, y] = P(j); g.fillStyle = col; g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); g.strokeStyle = '#10121b'; g.lineWidth = 2; g.stroke(); };
+  dot(r.X.length - 1, '#f87171'); dot(0, '#4ade80');
 }
 
 $('file').addEventListener('change', async (ev) => {
   const f = ev.target.files && ev.target.files[0];
   ev.target.value = '';
   if (!f) return;
-  $('home').innerHTML = `<div class="wrap"><div class="card"><span class="spinner"></span>${T.loading}</div></div>`;
+  $('home').innerHTML = loadingHtml(T.loading);
   try {
     const text = await f.text();
     await openDay(text, true);
@@ -189,13 +247,15 @@ function ensureMap() {
   if (map) return mapLoaded;
   const r = day.route, [lat, lon] = day.proj.toLL(r.X[0], r.Y[0]);
   map = new maplibregl.Map({
-    container: 'map', style: dark ? STYLE.dark : STYLE.light, center: [lon, lat], zoom: 16,
-    attributionControl: { compact: true }, maxPitch: 60, fadeDuration: 0, pitchWithRotate: false,
+    container: 'map', style: STYLE, center: [lon, lat], zoom: 16,
+    attributionControl: false, maxPitch: 60, fadeDuration: 0, pitchWithRotate: false,
   });
+  map.addControl(new maplibregl.AttributionControl({ compact: true }), 'top-right');
+  map.on('style.load', nightTheme);                  // before anything is drawn: no flash of the day colours
   let done;
   mapLoaded = new Promise((res) => { done = res; });
   let ready = false;
-  const finish = () => { if (ready) return; ready = true; addRouteLayers(); mapReady = true; calmMap(); setLabelLang(); applyPadding(); done(); };
+  const finish = () => { if (ready) return; ready = true; addRouteLayers(); mapReady = true; calmMap(); setLabelLang(); applyPadding(); foldCredits(); map.once('idle', foldCredits); done(); };
   map.on('load', finish);
   // No internet and no saved map: draw our own street map so navigation still works
   setTimeout(() => { if (!ready) { map.setStyle(blankStyle()); map.once('styledata', () => { addOwnStreets(); finish(); }); } }, 12000);
@@ -206,7 +266,7 @@ function ensureMap() {
   map.on('error', (e) => console.warn('map:', e && e.error && e.error.message));
   const el = document.createElement('div');
   el.className = 'car';
-  el.innerHTML = '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="#1a73e8" stroke="#fff" stroke-width="4"/><path d="M24 10 L34 33 L24 27.5 L14 33 Z" fill="#fff"/></svg>';
+  el.innerHTML = CAR_SVG;
   carMarker = new maplibregl.Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' }).setLngLat([lon, lat]).addTo(map);
   window.addEventListener('resize', applyPadding);
   requestAnimationFrame(tick);
@@ -215,7 +275,53 @@ function ensureMap() {
 
 function blankStyle() {
   return { version: 8, glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf', sources: {},
-    layers: [{ id: 'bg', type: 'background', paint: { 'background-color': dark ? '#10161d' : '#eef1f4' } }] };
+    layers: [{ id: 'bg', type: 'background', paint: { 'background-color': NIGHT.bg } }] };
+}
+
+// The night map of the design: the OpenFreeMap "liberty" street map recoloured navy, quiet roads, grey names
+const NIGHT = { bg: '#10121b', water: '#090b12', park: '#11161e', land: '#12141e', building: '#171a26', buildingLine: '#1d2030',
+  motorway: '#3b405a', major: '#363b53', secondary: '#30354a', minor: '#2a2e41', service: '#242838', path: '#1c1f2c',
+  casing: '#0d0f17', rail: '#1f2231', label: '#8d93a7', halo: '#0d0f17', waterLabel: '#4c5a82' };
+function nightTheme() {
+  const C = NIGHT;
+  for (const l of map.getStyle().layers) {
+    const id = l.id, t = l.type, sl = l['source-layer'] || '';
+    const set = (prop, v) => { try { map.setPaintProperty(id, prop, v); } catch { /* not on this layer */ } };
+    const hide = () => map.setLayoutProperty(id, 'visibility', 'none');
+    if (t === 'background') set('background-color', C.bg);
+    else if (t === 'raster' || t === 'hillshade') hide();
+    else if (t === 'fill') {
+      if (sl === 'water') set('fill-color', C.water);
+      else if (sl === 'building') { set('fill-color', C.building); set('fill-outline-color', C.buildingLine); }
+      else if (id === 'road_area_pattern') hide();
+      else if (sl === 'park' || /wood|grass|wetland/.test(id)) { set('fill-color', C.park); set('fill-opacity', 1); }
+      else { set('fill-color', C.land); set('fill-opacity', 1); }
+    } else if (t === 'line') {
+      if (sl === 'waterway') set('line-color', C.water);
+      else if (sl === 'boundary') hide();
+      else if (sl === 'park') set('line-color', C.park);
+      else if (sl === 'aeroway') set('line-color', C.service);
+      else if (/casing/.test(id)) set('line-color', C.casing);
+      else if (/rail|hatching/.test(id)) set('line-color', C.rail);
+      else if (/motorway/.test(id)) set('line-color', C.motorway);
+      else if (/trunk_primary/.test(id)) set('line-color', C.major);
+      else if (/secondary_tertiary|_link/.test(id)) set('line-color', C.secondary);
+      else if (/minor|street/.test(id)) set('line-color', C.minor);
+      else if (/service_track/.test(id)) set('line-color', C.service);
+      else if (/path_pedestrian/.test(id)) set('line-color', C.path);
+      else set('line-color', C.minor);
+    } else if (t === 'symbol') {
+      set('text-color', /water/.test(id) ? C.waterLabel : C.label);
+      set('text-halo-color', C.halo); set('text-halo-width', 1.2);
+      if (/one_way/.test(id)) set('icon-opacity', 0.3);
+    }
+  }
+}
+
+// The map credits start folded: a small (i) that opens them
+function foldCredits() {
+  const a = map && map.getContainer().querySelector('.maplibregl-ctrl-attrib.maplibregl-compact-show');
+  if (a) { a.classList.remove('maplibregl-compact-show'); a.setAttribute('open', ''); }
 }
 
 function addOwnStreets() {
@@ -228,7 +334,7 @@ function addOwnStreets() {
     lines.push([[lo1, la1], [lo2, la2]]);
   }
   map.addSource('own-streets', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'MultiLineString', coordinates: lines } } });
-  map.addLayer({ id: 'own-streets', type: 'line', source: 'own-streets', paint: { 'line-color': dark ? '#3a4656' : '#c4ccd6', 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1, 17, 7] } });
+  map.addLayer({ id: 'own-streets', type: 'line', source: 'own-streets', paint: { 'line-color': NIGHT.minor, 'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1, 17, 7] } });
 }
 
 function makeIcon(draw, size) {
@@ -246,10 +352,11 @@ function addRouteLayers() {
   }, 32), { pixelRatio: 2 });
   map.addImage('head', makeIcon((g, s) => {
     g.beginPath(); g.moveTo(s * 0.5, s * 0.08); g.lineTo(s * 0.9, s * 0.86); g.lineTo(s * 0.1, s * 0.86); g.closePath();
-    g.fillStyle = '#ffffff'; g.fill(); g.lineWidth = 5; g.strokeStyle = '#0b3d91'; g.lineJoin = 'round'; g.stroke();
+    g.fillStyle = '#f2f3f7'; g.fill(); g.lineWidth = 5; g.strokeStyle = '#0d0f17'; g.lineJoin = 'round'; g.stroke();
   }, 64), { pixelRatio: 2 });
   const empty = { type: 'FeatureCollection', features: [] };
-  for (const id of ['all', 'missed', 'far', 'near', 'back', 'man', 'manhead']) map.addSource(id, { type: 'geojson', data: empty });
+  // line metrics: the next stretch is drawn blue at the car turning violet ahead
+  for (const id of ['all', 'missed', 'far', 'near', 'back', 'man', 'manhead']) map.addSource(id, { type: 'geojson', data: empty, lineMetrics: id === 'near' });
   // Above the roads, below the street names (map styles order their layers differently)
   const layers = map.getStyle().layers;
   const firstLabel = (layers.find((l) => l.type === 'symbol' && l['source-layer'] === 'transportation_name')
@@ -259,22 +366,35 @@ function addRouteLayers() {
     paint: { 'line-color': color, 'line-width': width, ...(extra.paint || {}) },
   }, extra.top ? undefined : firstLabel);
   const zw = (a, b) => ['interpolate', ['exponential', 1.6], ['zoom'], 13, a, 18, b];
-  line('all', 'all', dark ? '#8392a6' : '#6b7a90', zw(1.5, 5), { paint: { 'line-opacity': 0.55 }, layout: { visibility: settings.showAll ? 'visible' : 'none' } });
-  line('missed', 'missed', '#e11d48', zw(3, 9), { paint: { 'line-dasharray': [1.2, 1.2], 'line-opacity': 0.9 } });
-  line('far-case', 'far', '#ffffff', zw(4, 13), { paint: { 'line-opacity': 0.8 } });
-  line('far', 'far', '#5b9bf0', zw(2.5, 9), { paint: { 'line-opacity': 0.85 } });
-  line('near-case', 'near', '#ffffff', zw(6, 18));
-  line('near', 'near', '#1a73e8', zw(4, 12));
-  line('back-case', 'back', '#ffffff', zw(6, 18));
-  line('back', 'back', '#f59e0b', zw(4, 12));
+  const grad = ['interpolate', ['linear'], ['line-progress'], 0, '#3d7bff', 1, '#8b5cf6'];
+  const glow = { 'line-blur': zw(5, 15) };
+  line('all', 'all', '#6c7285', zw(1.5, 5), { paint: { 'line-opacity': 0.55 }, layout: { visibility: settings.showAll ? 'visible' : 'none' } });
+  line('missed', 'missed', '#f87171', zw(3, 9), { paint: { 'line-dasharray': [1.2, 1.2], 'line-opacity': 0.9 } });
+  line('far', 'far', '#5b5fd9', zw(2.5, 9), { paint: { 'line-opacity': 0.6 } });
+  line('near-glow', 'near', '#3d7bff', zw(11, 34), { paint: { ...glow, 'line-gradient': grad, 'line-opacity': 0.55 } });
+  line('near', 'near', '#3d7bff', zw(4.8, 14.4), { paint: { 'line-gradient': grad } });
+  line('back-glow', 'back', BACK.off, zw(11, 34), { paint: { ...glow, 'line-opacity': 0.5 } });
+  line('back', 'back', BACK.off, zw(4.8, 14.4));
+  backTone = 'off';
   const chev = (id, src) => map.addLayer({
     id, type: 'symbol', source: src,
     layout: { 'symbol-placement': 'line', 'symbol-spacing': 46, 'icon-image': 'chev', 'icon-size': ['interpolate', ['linear'], ['zoom'], 14, 0.55, 18, 1.1], 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'icon-rotation-alignment': 'map', 'icon-keep-upright': false },
+    paint: { 'icon-opacity': 0.45 },
   }, firstLabel);
   chev('near-chev', 'near'); chev('far-chev', 'far'); chev('back-chev', 'back');
-  line('man-case', 'man', '#0b3d91', zw(8, 22), { top: true });
-  line('man', 'man', '#ffffff', zw(4, 13), { top: true });
+  line('man-case', 'man', '#0d0f17', zw(8, 22), { top: true });
+  line('man', 'man', '#f2f3f7', zw(4, 13), { top: true });
   map.addLayer({ id: 'manhead', type: 'symbol', source: 'manhead', layout: { 'icon-image': 'head', 'icon-rotate': ['get', 'b'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'icon-size': ['interpolate', ['linear'], ['zoom'], 14, 0.45, 18, 1] } });
+}
+
+// The way back: orange after leaving the route, blue on the way to the start or to where the drive stopped
+const BACK = { off: '#fb923c', start: '#4f7cff' };
+let backTone = null;
+function setBackTone(why) {
+  const tone = why === 'off' ? 'off' : 'start';
+  if (!mapReady || tone === backTone) return;
+  backTone = tone;
+  map.setPaintProperty('back', 'line-color', BACK[tone]); map.setPaintProperty('back-glow', 'line-color', BACK[tone]);
 }
 
 // A driving map: no 3D buildings, no shop and cafe icons; streets, one-way arrows and names stay
@@ -315,7 +435,7 @@ function setHead(coords) {
 function applyPadding() {
   if (!map) return;
   const land = innerWidth > innerHeight && innerHeight < 560;
-  const bottomH = ($('bottom') && !$('navUi').hidden) ? $('bottom').offsetHeight + 16 : 20;
+  const bottomH = ($('bottom') && !$('navUi').hidden) ? Math.max(20, innerHeight - $('bottom').getBoundingClientRect().top + 16) : 20;
   const pad = land
     ? { top: Math.round(innerHeight * 0.45), bottom: 20, left: Math.min(446, innerWidth * 0.48 + 16), right: 0 }
     : { top: Math.round(innerHeight * 0.44), bottom: bottomH, left: 0, right: 0 };
@@ -324,7 +444,7 @@ function applyPadding() {
 
 function setFollow(on) {
   follow = on;
-  $('btnRecenter').classList.toggle('alert', !on && screen === 'nav');
+  $('btnRecenter').hidden = on || screen !== 'nav';
   clearTimeout(followTimer);
   if (!on) followTimer = setTimeout(() => setFollow(true), 20000);
   else { applyPadding(); glideToCar(); }
@@ -397,6 +517,7 @@ function startNav({ restart = false, along = null }) {
   screen = 'nav'; setPaused(false);
   $('home').hidden = true; $('navUi').hidden = false;
   renderWaiting(T.waitingGps);
+  renderStatus(nav.along);
   keepAwake();
   const loaded = ensureMap();                       // creates the map and the car at once
   carMarker.getElement().style.display = '';
@@ -485,7 +606,7 @@ function showGpsHelp(kind) {
   $('ghRetry').textContent = T.retry;
   $('ghPractice').textContent = T.practice;
   $('gpsHelp').hidden = false;
-  if (!nav || nav.mode === 'acquire' || !nav.lastFix) renderWaiting(kind === 'coarse' ? T.waitingPrecise(T.dist(gps.acc || 0)) : T.gpsTitle[kind]);
+  if (!nav || nav.mode === 'acquire' || !nav.lastFix) renderWaiting(kind === 'coarse' ? T.waitingPrecise(T.dist(gps.acc || 0)) : T.waitingGps);   // the card below says why
 }
 function hideGpsHelp() { gps.problem = null; $('gpsHelp').hidden = true; }
 $('ghRetry').onclick = () => { hideGpsHelp(); gps.started = Date.now(); gps.lastAt = 0; gps.lastGoodAt = 0; startGps(); };
@@ -494,13 +615,17 @@ $('ghPractice').onclick = () => { hideGpsHelp(); startSim(); };
 function renderGpsChip() {
   const el = $('gpsChip');
   if (!el) return;
-  if (sim) { el.className = 'gpschip sim'; el.textContent = T.practice; return; }
-  if (paused) { el.className = 'gpschip none'; el.textContent = T.gpsOff; return; }
-  // A phone standing still may report rarely: a reading from the last minute still counts
-  const fresh = gps.lastAt && Date.now() - gps.lastAt < 60000;
-  const acc = gps.acc;
-  el.className = 'gpschip ' + (!gps.lastAt ? 'none' : !fresh ? 'none' : acc <= 20 ? 'good' : acc <= GOOD_ACC ? 'fair' : 'poor');
-  el.textContent = !gps.lastAt ? T.gpsNone : !fresh ? T.gpsWait : T.gpsAcc(acc);
+  let cls, about;
+  if (sim) { cls = 'sim'; about = T.practice; }
+  else if (paused) { cls = 'none'; about = T.gpsOff; }
+  else {
+    // A phone standing still may report rarely: a reading from the last minute still counts
+    const fresh = gps.lastAt && Date.now() - gps.lastAt < 60000;
+    const acc = gps.acc;
+    cls = !gps.lastAt || !fresh ? 'none' : acc <= 20 ? 'good' : acc <= GOOD_ACC ? 'fair' : 'poor';
+    about = !gps.lastAt ? T.gpsNone : !fresh ? T.gpsWait : T.gpsAcc(acc);
+  }
+  el.className = 'gpschip ' + cls; el.textContent = 'GPS'; el.title = about; el.setAttribute('aria-label', about);
 }
 
 function handleFix(fix) {
@@ -547,52 +672,67 @@ function streetText(m) {
   return settings.lang === 'ka' ? (m.name || m.ref || m.en) : (m.en || m.name || m.ref);
 }
 
+// The instruction card: tone, a small tag, arrow, distance, what to do (small) and the street (large)
+function setCard({ tone = 'violet', tag = '', icon = '', dist = '', instr = '', street = '' }) {
+  $('banner').className = 'banner glass tone-' + tone;
+  $('bTag').hidden = !tag; $('bTagText').textContent = tag;
+  $('bIcon').innerHTML = icon;
+  const k = dist.lastIndexOf(' ');
+  $('bDist').innerHTML = dist ? `<span class="num">${esc(dist.slice(0, k))}</span><span class="unit">${esc(dist.slice(k + 1))}</span>` : '';
+  $('bInstr').textContent = instr; $('bStreet').textContent = street || '';
+}
+
 function renderWaiting(msg) {
-  const b = $('banner');
-  b.className = 'banner wait';
-  $('bIcon').innerHTML = '';
-  $('bDist').textContent = '';
-  $('bInstr').textContent = msg;
-  $('bStreet').textContent = day ? day.name : '';
-  $('thenChip').hidden = true;
+  setCard({ tone: 'grey', icon: UI.gps, instr: day ? day.name : '', street: msg });
+  $('thenChip').hidden = true; $('btnSkip').hidden = true;
+}
+
+// Time left, km left and the time the day ends, from the driving speed so far
+function renderStatus(along) {
+  const rest = Math.max(0, day.route.total - along);
+  const avg = moving.secs > 120 ? moving.dist / moving.secs : 6;
+  const mins = Math.round(rest / Math.max(2, avg) / 60);
+  $('stTime').textContent = T.timeLeft(Math.floor(mins / 60), mins % 60);
+  $('stKm').textContent = T.km((rest / 1000).toFixed(1));
+  const end = new Date(Date.now() + mins * 60000);
+  $('stEnd').textContent = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
+  $('barFill').style.width = (along / day.route.total * 100).toFixed(2) + '%';
 }
 
 // Draw again without a new GPS reading (after a setting change, a skip, the coverage refresh)
-function rerender(snap) { if (lastRawFix) render(snap, lastRawFix, 300); }
+function rerender(snap) { lastSnap = snap; if (lastRawFix) render(snap, lastRawFix, 300); }
 
 function render(snap, fix, dur) {
   const R = day.route, P = day.proj;
-  // Banner
-  const b = $('banner');
-  let cls = '', icon = '', dist = '', instr = '', street = '';
+  // The instruction card
+  let card = { tone: 'violet' };
   if (snap.mode === 'done') {
-    icon = arrowSvg('arrive'); instr = T.done;
-    const c = nav.coverage();
-    street = T.report((c.driven / 1000).toFixed(1), c.missed.length, T.dist(c.missedMeters));
+    card = { icon: arrowSvg('arrive'), instr: day.name, street: T.done };
   } else if (snap.mode === 'back') {
-    cls = snap.back.why === 'off' ? 'back' : 'start';
-    const headline = snap.back.why === 'off' ? T.offRoute : snap.back.why === 'start' ? T.toStart : T.toResume;
+    const why = snap.back.why;
+    card = { tone: why === 'off' ? 'orange' : 'blue', tag: why === 'off' ? T.tagOff : why === 'start' ? T.tagStart : T.tagResume };
     if (snap.next) {
-      icon = arrowSvg(snap.next.m.kind, snap.next.m.a, snap.next.m.exit);
-      dist = T.dist(snap.next.dist); instr = kindText(snap.next.m); street = headline;
+      const m = snap.next.m;
+      Object.assign(card, { icon: arrowSvg(m.kind, m.a, m.exit), dist: T.dist(snap.next.dist), instr: kindText(m), street: m.kind === 'rejoin' ? '' : streetText(m) });
     } else {
       const tp = pointAt(R, snap.back.target.along), brg = bearing(fix.x, fix.y, tp[0], tp[1]);
-      icon = arrowSvg('direction', angleDiff(nav.heading ?? brg, brg));
-      dist = T.dist(Math.hypot(tp[0] - fix.x, tp[1] - fix.y)); instr = T.noWayBack; street = headline;
+      Object.assign(card, { icon: arrowSvg('direction', angleDiff(nav.heading ?? brg, brg)), dist: T.dist(Math.hypot(tp[0] - fix.x, tp[1] - fix.y)),
+        instr: why === 'off' ? T.noWayBack : why === 'start' ? T.toStart : T.toResume });
     }
+    setBackTone(why);
   } else if (snap.mode === 'acquire') {
-    cls = 'wait'; street = day.name;
-    instr = fix && fix.acc > GOOD_ACC ? T.waitingPrecise(T.dist(fix.acc)) : T.waitingGps;
+    card = { tone: 'grey', icon: UI.gps, instr: day.name, street: fix && fix.acc > GOOD_ACC ? T.waitingPrecise(T.dist(fix.acc)) : T.waitingGps };
   } else if (snap.next) {
     const m = snap.next.m;
-    icon = arrowSvg(m.kind, m.a, m.exit); dist = T.dist(snap.next.dist); instr = kindText(m); street = streetText(m);
+    card = { icon: arrowSvg(m.kind, m.a, m.exit), dist: T.dist(snap.next.dist), instr: kindText(m), street: streetText(m) };
   }
-  b.className = 'banner ' + cls;
-  $('bIcon').innerHTML = icon; $('bDist').textContent = dist; $('bInstr').textContent = instr; $('bStreet').textContent = street || '';
+  setCard(card);
   const th = snap.then;
   const showThen = th && snap.next && snap.mode !== 'done' && th.gap < 120 && snap.next.dist < 450;
   $('thenChip').hidden = !showThen;
   if (showThen) { $('thenLabel').textContent = T.then; $('thenIcon').innerHTML = arrowSvg(th.m.kind, th.m.a, th.m.exit); }
+  // Skip the next turn (a closed street): while following the route, or after leaving it
+  $('btnSkip').hidden = !(snap.next && snap.next.m.kind !== 'arrive' && (snap.mode === 'route' || (snap.mode === 'back' && snap.back.why === 'off')));
 
   // Route on the map: only what is ahead
   if (mapReady) {
@@ -633,17 +773,10 @@ function render(snap, fix, dur) {
   let zoom = 17.4 - clamp((kmh - 15) / 45, 0, 1) * 1.1;
   if (snap.next && snap.next.dist < 150) zoom += 0.3;
   moveTo(lon, lat, brg, zoom, dur);
-  carMarker.getElement().classList.toggle('off', snap.mode === 'back');
+  carMarker.getElement().classList.toggle('off', snap.mode === 'back' && snap.back.why === 'off');
 
-  // Bottom bar
-  const pct = Math.round(snap.along / R.total * 100);
-  $('statKm').textContent = T.progress((snap.along / 1000).toFixed(1), (R.total / 1000).toFixed(1), pct);
-  $('barFill').style.width = (snap.along / R.total * 100).toFixed(2) + '%';
-  const avg = moving.secs > 120 ? moving.dist / moving.secs : 6;
-  const left = Math.max(0, R.total - snap.along) / Math.max(2, avg);
-  let eta = T.eta(Math.floor(left / 3600), Math.round((left % 3600) / 60));
-  if (cov && cov.missed.length) eta += ' · ' + T.missedSummary(cov.missed.length, T.dist(cov.missedMeters));
-  $('statEta').textContent = eta;
+  // Status line and progress
+  renderStatus(snap.along);
   renderGpsChip();
 }
 
@@ -670,11 +803,16 @@ function showWholeDay() {
 
 $('btnRecenter').onclick = () => setFollow(true);
 $('btnRecenter').setAttribute('aria-label', T.recenterLabel);
+$('btnRecenter').innerHTML = UI.recentre;
+$('btnMenu').innerHTML = UI.menu;
+$('btnMenu').setAttribute('aria-label', T.menu);
+$('ghIcon').innerHTML = UI.gps;
+$('skipIcon').innerHTML = UI.skip;
+$('skipLabel').textContent = T.skipShort;
+$('btnSkip').setAttribute('aria-label', T.skipTurn);
 function renderMute() {
   const off = settings.muted || settings.voice === 'off';
-  $('btnMute').innerHTML = off
-    ? '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M17 9l5 6M22 9l-5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
-    : '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  $('btnMute').innerHTML = off ? UI.soundOff : UI.soundOn;
 }
 $('btnMute').onclick = () => { settings.muted = !settings.muted; saveSettings(); renderMute(); if (!settings.muted) { unlockSound(); beep(1); } };
 $('btnMenu').onclick = () => openMenu();
@@ -689,6 +827,15 @@ function toast(text, btnText, onBtn) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { $('toast').hidden = true; }, btnText ? 15000 : 4000);
 }
+
+// Skip the next turn (a closed street): the stretch goes on the missed list, and the message offers the way back
+$('btnSkip').onclick = () => {
+  if (!nav || paused || screen !== 'nav') return;
+  const from = nav.along, before = nav.skips.length, to = nav.jump(1);
+  $('btnSkip').hidden = true;
+  if (nav.skips.length > before) toast(T.skipped(T.dist(to - from)), T.goBack, () => { if (nav.undoSkip()) rerender(nav.snapshot()); refreshCoverage(); });
+  refreshCoverage();                      // the next GPS reading brings the new instruction
+};
 
 /* ------------------------------------------------------------------ pause (a break: no GPS, no guidance) */
 
@@ -706,11 +853,8 @@ function pauseNav() {
   try { speechSynthesis.cancel(); } catch { /* no speech */ }
   say(speech(settings.voice, { type: 'paused' }));
   if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
-  const b = $('banner');
-  b.className = 'banner wait';
-  $('bIcon').innerHTML = arrowSvg('pause'); $('bDist').textContent = '';
-  $('bInstr').textContent = T.pausedTitle; $('bStreet').textContent = day.name;
-  $('thenChip').hidden = true;
+  setCard({ tone: 'grey', tag: T.tagPaused, icon: UI.pause, instr: day.name, street: T.pausedTitle });
+  $('thenChip').hidden = true; $('btnSkip').hidden = true;
   $('pcText').textContent = T.pausedText; $('pcResume').textContent = T.resumeNav;
   setLine('man', []); setHead(null);
   renderGpsChip();
@@ -737,10 +881,9 @@ function openMenu() {
   cov = c;
   const sh = $('sheet');
   sh.innerHTML = `<div class="grab"></div>
-    ${paused ? `<button class="item" id="mResume">${T.resumeNav}</button>` : `<button class="item" id="mPause">${T.pauseNav}</button>`}
-    <button class="item" id="mSkip">${T.skipTurn}</button>
+    ${paused ? `<button class="item accent" id="mResume">${UI.play}<span>${T.resumeNav}</span></button>` : `<button class="item accent" id="mPause">${UI.pause}<span>${T.pauseNav}</span></button>`}
+    <button class="item" id="mHere">${UI.gps}<span>${T.fromHere}</span></button>
     <button class="item" id="mBack">${T.backTurn}</button>
-    <button class="item" id="mHere">${T.fromHere}</button>
     <h3>${T.missedTitle}</h3>
     ${c.missed.length ? `<ul class="missed-list">${c.missed.map(([a, b], i) => `<li><b>${i + 1}.</b> ${T.missedAt((a / 1000).toFixed(2), T.dist(b - a))}</li>`).join('')}</ul>` : `<div class="note">${T.missedNone}</div>`}
     <button class="item" id="mShareMissed" ${c.missed.length ? '' : 'disabled'}>${T.shareMissed}</button>
@@ -752,7 +895,6 @@ function openMenu() {
   sh.hidden = false; $('sheetBack').hidden = false;
   if (paused) $('mResume').onclick = () => { closeMenu(); resumeNav(); };
   else $('mPause').onclick = () => { closeMenu(); pauseNav(); };
-  $('mSkip').onclick = () => { const from = nav.along, to = nav.jump(1); closeMenu(); toast(T.jumped(T.dist(to - from))); refreshCoverage(true); };
   $('mBack').onclick = () => { nav.jump(-1); closeMenu(); refreshCoverage(true); };
   $('mHere').onclick = () => { const moved = nav.continueHere(); closeMenu(); if (moved != null && moved > 10) toast(T.jumped(T.dist(moved))); refreshCoverage(true); };
   $('mShareMissed').onclick = () => shareGpx(missedGpx(c.missed), 'missed');
@@ -903,6 +1045,7 @@ function stopSim(restartGps = false) {
 function renderSimBar() {
   const bar = $('simBar');
   bar.querySelectorAll('[data-mult]').forEach((b) => { b.classList.toggle('on', +b.dataset.mult === simMult); b.onclick = () => { simMult = +b.dataset.mult; renderSimBar(); }; });
+  $('simTitle').textContent = T.practice;
   $('simMiss').textContent = T.simMissShort; $('simMiss').onclick = () => sim && sim.planMiss();
   $('simStop').textContent = T.simStopShort; $('simStop').onclick = () => stopSim(true);
 }
@@ -922,8 +1065,7 @@ async function warmOffline(bbox) {
     for (let z = 10; z <= maxz; z++) {
       for (let x = tx(w, z); x <= tx(e, z); x++) for (let y = ty(n, z); y <= ty(s, z); y++) urls.push(tpl.replace('{z}', z).replace('{x}', x).replace('{y}', y));
     }
-    const style = dark ? STYLE.dark : STYLE.light;
-    urls.push(style);
+    urls.push(STYLE);
     for (const font of ['Noto Sans Regular', 'Noto Sans Bold', 'Noto Sans Italic']) {
       for (const range of ['0-255', '256-511', '4096-4351', '8192-8447']) urls.push(`https://tiles.openfreemap.org/fonts/${encodeURIComponent(font)}/${range}.pbf`);
     }

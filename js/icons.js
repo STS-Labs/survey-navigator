@@ -58,3 +58,19 @@ export function arrowSvg(kind, a = 0, exit = 1) {
   }
   return `<svg viewBox="0 0 100 100" aria-hidden="true">${body}</svg>`;
 }
+
+// Night design buttons and marks (24 x 24, drawn in the text colour)
+const ui = (body) => `<svg viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
+export const UI = {
+  menu: ui('<path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'),
+  soundOn: ui('<path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 010 7M19 5.9a8.6 8.6 0 010 12.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'),
+  soundOff: ui('<path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M17 9l5 6M22 9l-5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'),
+  recentre: ui('<circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.4" fill="currentColor"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'),
+  pause: ui('<rect x="6" y="5" width="4" height="14" rx="1.3" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.3" fill="currentColor"/>'),
+  play: ui('<path d="M7 5.2v13.6L18.5 12z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>'),
+  gps: ui('<path d="M12 2.8l7.5 17.7-7.5-3.9-7.5 3.9z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'),
+  skip: ui('<path d="M5 5.5v13l9.5-6.5z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="16.2" y="5.5" width="3" height="13" rx="1.2" fill="currentColor"/>'),
+};
+
+// The car on the map: a ring with an arrow (the ring's colour comes from the stylesheet)
+export const CAR_SVG = '<svg viewBox="0 0 48 48" aria-hidden="true"><circle class="ring" cx="24" cy="24" r="20.25" fill="#1d1b31" stroke-width="3.5"/><path d="M24 12.5L32.5 32 24 27.5 15.5 32z" fill="#f2f3f7" stroke="#f2f3f7" stroke-width="1.5" stroke-linejoin="round"/></svg>';
