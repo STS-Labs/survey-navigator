@@ -6,7 +6,7 @@ import { arrowSvg, UI, CAR_SVG } from './icons.js';
 import { SURVEY_DAYS, loadSurveyDay } from './days.js';
 import { VOICE_DIR, VOICE_CLIPS, clipsFor, gapAfter } from './voice.js';
 
-const APP_VERSION = '1.5.3 (14 Oct 2026)';
+const APP_VERSION = '1.5.4 (14 Oct 2026)';
 const NET_URL = 'data/tbilisi-net.json';
 const STYLE = 'https://tiles.openfreemap.org/styles/liberty';      // recoloured to the night design on load
 const TILEJSON = 'https://tiles.openfreemap.org/planet';
@@ -25,8 +25,11 @@ const store = {
 };
 const K = { route: 'sn1.route', settings: 'sn1.settings', prog: (h) => 'sn1.prog.' + h, trace: (h) => 'sn1.trace.' + h, dayMeta: 'sn1.daymeta' };
 
-// Screens in Georgian, spoken instructions in English (there is no choice for either)
-const settings = Object.assign({ showAll: false, muted: false }, store.get(K.settings, {}), { lang: 'ka', voice: 'en' });
+// Screens in Georgian only. The voice is a choice (since 1.5.4): the recorded Georgian clips ('ka', the
+// default) or the phone's own English voice ('en'). The older 'voice' setting of 1.3 is not used any more.
+const settings = Object.assign({ showAll: false, muted: false }, store.get(K.settings, {}), { lang: 'ka' });
+delete settings.voice;
+if (settings.voiceLang !== 'en') settings.voiceLang = 'ka';
 const saveSettings = () => store.set(K.settings, settings);
 const T = STR.ka;
 
@@ -87,7 +90,7 @@ function renderHome(msg = '') {
   const foot = `<p class="credits">${T.about} · ${T.version} ${APP_VERSION}</p>`;
   const picker = `<section id="dayChoices" ${dayPickerOpen ? '' : 'hidden'}><h1 class="title">${T.chooseDay}</h1>${dayTiles()}</section>`;
   if (!day) {
-    h.innerHTML = `<div class="wrap">${brandHtml()}${errHtml(msg)}${picker}<button class="btn quiet" id="hOpen">${T.openFile}</button>${foot}</div>`;
+    h.innerHTML = `<div class="wrap">${brandHtml()}${errHtml(msg)}${picker}<button class="btn quiet" id="hOpen">${T.openFile}</button>${voiceRow()}${foot}</div>`;
   } else {
     const r = day.route, prog = savedProgress();
     const started = prog && prog.along > 20;
@@ -109,7 +112,7 @@ function renderHome(msg = '') {
         <button class="btn" id="hChooseDay" aria-expanded="${dayPickerOpen}" aria-controls="dayChoices">${T.chooseDay}</button>
         <button class="btn quiet" id="hOpen">${T.openAnother}</button>
       </div>
-      ${picker}${foot}</div>`;
+      ${voiceRow()}${picker}${foot}</div>`;
     drawMiniMap($('miniMap'));
     $('hStart').onclick = () => startNav({});
     if (started) $('hRestart').onclick = () => { if (confirm(T.restartConfirm)) startNav({ restart: true }); };
@@ -121,6 +124,7 @@ function renderHome(msg = '') {
     };
   }
   $('hOpen').onclick = () => $('file').click();
+  bindVoiceRow(h);
   h.querySelectorAll('[data-day]').forEach((button) => {
     button.onclick = () => chooseSurveyDay(Number(button.dataset.day));
   });
@@ -652,7 +656,7 @@ function handleFix(fix) {
 }
 
 function onEvent(e) {
-  if (e.type === 'prompt') { if (settings.voice === 'beep') beep(e.stage === 'near' ? 2 : 1); else speak(e); return; }
+  if (e.type === 'prompt') { speak(e); return; }
   if (e.type === 'off' || e.type === 'start' || e.type === 'resume') { speak(e); beep(1); }
   if (e.type === 'rejoin') { speak(e); toast(T.rejoined); refreshCoverage(true); }
   if (e.type === 'skip') {
@@ -811,8 +815,7 @@ $('skipIcon').innerHTML = UI.skip;
 $('skipLabel').textContent = T.skipShort;
 $('btnSkip').setAttribute('aria-label', T.skipTurn);
 function renderMute() {
-  const off = settings.muted || settings.voice === 'off';
-  $('btnMute').innerHTML = off ? UI.soundOff : UI.soundOn;
+  $('btnMute').innerHTML = settings.muted ? UI.soundOff : UI.soundOn;
 }
 $('btnMute').onclick = () => { settings.muted = !settings.muted; saveSettings(); renderMute(); if (!settings.muted) { unlockSound(); beep(1); } };
 $('btnMenu').onclick = () => openMenu();
@@ -952,6 +955,7 @@ function openMenu() {
     <button class="item" id="mShareMissed" ${c.missed.length ? '' : 'disabled'}>${T.shareMissed}</button>
     <button class="item" id="mShareTrack">${T.shareTrack}</button>
     <button class="item" id="mAll">${settings.showAll ? '✓ ' : ''}${T.showAll}</button>
+    ${voiceRow()}
     <button class="item" id="mSim">${sim ? T.stopSim : T.simulate}</button>
     <button class="item danger" id="mEnd">${T.endNav}</button>
     <button class="item" id="mClose">${T.close}</button>`;
@@ -963,6 +967,7 @@ function openMenu() {
   $('mShareMissed').onclick = () => shareGpx(missedGpx(c.missed), 'missed');
   $('mShareTrack').onclick = () => shareGpx(trackGpx(), 'driven');
   $('mAll').onclick = () => { settings.showAll = !settings.showAll; saveSettings(); showWholeDay(); openMenu(); };
+  bindVoiceRow(sh);
   $('mSim').onclick = () => { closeMenu(); if (paused) setPaused(false); if (sim) stopSim(true); else startSim(); };
   $('mEnd').onclick = () => { closeMenu(); stopNav(); };
   $('mClose').onclick = () => closeMenu();
@@ -1028,9 +1033,11 @@ async function keepAwake() {
 let audioCtx = null, voiceList = [];
 function loadVoices() { try { voiceList = speechSynthesis.getVoices() || []; } catch { voiceList = []; } }
 if ('speechSynthesis' in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+// A better-sounding English voice if the phone has one downloaded; otherwise the phone's usual English voice
+// (not just the first in the list: on an iPhone that can be one of the joke voices)
 function pickVoice(code) {
   const list = voiceList.filter((v) => (v.lang || '').toLowerCase().startsWith(code));
-  return list.find((v) => /enhanced|premium/i.test(v.name)) || list.find((v) => v.default) || list[0] || null;
+  return list.find((v) => /enhanced|premium/i.test(v.name)) || list.find((v) => v.default) || null;
 }
 
 function unlockSound() {
@@ -1075,19 +1082,22 @@ function playClips(names) {
   voiceLog.push(names.join('+'));
   return true;
 }
-// Say what goes with a navigator event: the recorded clips, or the English voice when a clip is missing
+// Say what goes with a navigator event. Georgian: the recorded clips (a line whose clip is missing is said
+// by the English voice). English: the phone's English voice, started at once so that a tap can wake it.
 async function speak(e, force = false) {
-  if (settings.voice === 'off' || settings.voice === 'beep' || (!force && settings.muted)) return;
-  const names = clipsFor(e);
-  if (names && audioCtx) {
-    if (!names.every((n) => voiceBuf.has(n))) await Promise.race([loadVoice(), new Promise((r) => setTimeout(r, 2000))]);
-    if (playClips(names)) return;
+  if (!force && settings.muted) return;
+  if (settings.voiceLang === 'ka' || !('speechSynthesis' in window)) {
+    const names = clipsFor(e);
+    if (names && audioCtx) {
+      if (!names.every((n) => voiceBuf.has(n))) await Promise.race([loadVoice(), new Promise((r) => setTimeout(r, 2000))]);
+      if (playClips(names)) return;
+    }
   }
-  say(speech(settings.voice, e), force);
+  say(speech('en', e), force);
 }
 
 function beep(n = 1) {
-  if (settings.muted || settings.voice === 'off' || !audioCtx) return;
+  if (settings.muted || !audioCtx) return;
   const t0 = audioCtx.currentTime;
   for (let i = 0; i < n; i++) {
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -1100,18 +1110,37 @@ function beep(n = 1) {
 
 function say(text, force = false) {
   if (!text || !('speechSynthesis' in window)) return;
-  if (!force && (settings.muted || settings.voice === 'off' || settings.voice === 'beep')) return;
-  if (settings.voice === 'off' || settings.voice === 'beep') return;
-  const code = settings.voice;
+  if (!force && settings.muted) return;
   try {
     const u = new SpeechSynthesisUtterance(text);
-    const v = pickVoice(code);
+    const v = pickVoice('en');
     if (v) u.voice = v;
-    u.lang = v ? v.lang : { en: 'en-US', ru: 'ru-RU', ka: 'ka-GE' }[code];
+    u.lang = v ? v.lang : 'en-US';
     u.rate = 1.0;
     speechSynthesis.cancel();
     speechSynthesis.speak(u);
   } catch { /* speech not available */ }
+}
+
+// The voice choice, on the start screen and in the menu: Georgian (recorded) or English (the phone's voice).
+// A tap plays a sample in the chosen voice: a turn on the start screen; while driving, only how things stand
+// (so that nobody takes a sample turn for a real one).
+const VOICE_SAMPLE = { type: 'prompt', stage: 'far', dist: 300, m: { kind: 'right' } };
+function voiceRow() {
+  return `<div class="voicerow"><span class="vr-label">${UI.soundOn}<span>${T.voiceLang}</span></span>
+    <div class="seg2" role="radiogroup" aria-label="${T.voiceLang}">${['ka', 'en'].map((v) => `<button role="radio" data-voice="${v}"
+      aria-checked="${settings.voiceLang === v}" class="${settings.voiceLang === v ? 'on' : ''}">${T.voiceNames[v]}</button>`).join('')}</div></div>`;
+}
+function bindVoiceRow(root) {
+  const buttons = [...root.querySelectorAll('[data-voice]')];
+  for (const b of buttons) {
+    b.onclick = () => {
+      settings.voiceLang = b.dataset.voice; saveSettings();
+      for (const x of buttons) { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); }
+      unlockSound(); stopVoice();
+      speak(screen === 'nav' ? { type: paused ? 'paused' : 'resumed' } : VOICE_SAMPLE, true);
+    };
+  }
 }
 
 /* ------------------------------------------------------------------ practice drive */
@@ -1211,7 +1240,7 @@ window.__sn = {
   pause: () => pauseNav(),
   resume: () => resumeNav(),
   get follow() { return follow; }, get paused() { return paused; },
-  get voice() { return { loaded: voiceBuf.size, log: voiceLog.slice() }; },
+  get voice() { return { lang: settings.voiceLang, loaded: voiceBuf.size, log: voiceLog.slice() }; },
   snap: () => lastSnap && { mode: lastSnap.mode, along: lastSnap.along, next: lastSnap.next && { kind: lastSnap.next.m.kind, dist: lastSnap.next.dist }, back: !!lastSnap.back },
   coverage: () => nav && nav.coverage(),
   feed: (fix) => handleFix(fix),

@@ -22,6 +22,10 @@ The screens are in Georgian only. The spoken instructions are recorded in Georgi
 missing, the iPhone's English voice says that line instead. On iPhones with iOS 16.4 or newer the voice
 also plays with the ring / silent switch on silent.
 
+**ხმის ენა** (voice) on the start screen and in the menu switches the voice between **ქართული** (the
+recordings, the default) and **English** (the iPhone's own English voice, "In 300 meters, turn right").
+A tap plays a sample in the chosen voice; the choice is kept on the phone.
+
 The six supplied daily routes are bundled unchanged in `data/routes/`. They are cached with the app
 after a successful online service-worker installation, so the day picker also works offline once
 that download is complete. Each GPX keeps its own saved progress; choosing another day does not clear it.

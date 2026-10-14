@@ -1,6 +1,7 @@
 // Words on screen and spoken prompts. Since 1.4 the screens are Georgian only. Since 1.5.3 the voice is the
-// recorded Georgian clips (js/voice.js, audio/ka/); the English sentences below are only the fallback when a
-// clip is missing. The English screen text and the other voices are kept for the tests and for later.
+// recorded Georgian clips (js/voice.js, audio/ka/); since 1.5.4 the driver can choose English instead, and the
+// English sentences below are what the phone's English voice says (also for a Georgian clip that is missing).
+// The English screen text and the Russian and Georgian sentences are kept for the tests and for later.
 
 const km = (m, unitM, unitKm) => (m < 950 ? `${Math.max(0, Math.round(m / 10) * 10)} ${unitM}` : `${(m / 1000).toFixed(1)} ${unitKm}`);
 
@@ -109,6 +110,8 @@ export const STR = {
     skipShort: 'Skip',
     km: (v) => `${v} km`,
     timeLeft: (h, m) => (h ? `${h} h ${m} min` : `${m} min`),
+    // voice choice (1.5.4)
+    voiceLang: 'Voice', voiceNames: { ka: 'ქართული', en: 'English' },
   },
   ka: {
     appName: 'STS NAV',
@@ -215,6 +218,8 @@ export const STR = {
     skipShort: 'გამოტოვება',
     km: (v) => `${v} კმ`,
     timeLeft: (h, m) => (h ? `${h} სთ ${m} წთ` : `${m} წთ`),
+    // voice choice (1.5.4)
+    voiceLang: 'ხმის ენა', voiceNames: { ka: 'ქართული', en: 'English' },
   },
 };
 

@@ -160,7 +160,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   position: fixed; z-index: 21; left: 0; right: 0; bottom: 0; max-height: 86vh; overflow: auto; -webkit-overflow-scrolling: touch;
   background: var(--bg-app); border: 1px solid var(--hair); border-bottom: 0; border-radius: 28px 28px 0 0;
   padding: 12px calc(var(--sr) + 16px) calc(var(--sb) + 16px) calc(var(--sl) + 16px);
-  overscroll-behavior: contain; will-change: transform;
+  overscroll-behavior: none; will-change: transform;          /* no bounce inside it: a pull down at the top moves the whole sheet */
 }
 .sheet .grab-zone { margin: -12px 0 0; padding: 12px 0 14px; }        /* a bigger place to grab the sheet */
 .sheet .grab { width: 40px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .18); margin: 0 auto; }
@@ -177,6 +177,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .missed-list { list-style: none; margin: 0 0 10px; padding: 0; }
 .missed-list li { padding: 4px; font: 500 17px/1.35 var(--font); color: var(--t2); }
 .missed-list li b { font-weight: 500; color: var(--red); margin-right: 6px; }
+
+/* the voice choice (start screen and menu): Georgian / English */
+.voicerow {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 10px 10px 16px;
+  border-radius: 16px; background: var(--raised); border: 1px solid var(--hair);
+}
+.sheet .voicerow { margin: 0 0 8px; border: 0; }
+.vr-label { display: flex; align-items: center; gap: 12px; white-space: nowrap; font: 500 17px/1.35 var(--font); }
+.vr-label svg { width: 24px; height: 24px; flex: none; display: block; color: var(--t2); }
+.seg2 { flex: none; margin-left: auto; display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--bg-app); }   /* on a narrow phone it moves under the label */
+.seg2 button {
+  min-width: 80px; height: 38px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent;
+  color: var(--t2); font: 500 15px/1 var(--font);
+}
+.seg2 button.on { background: var(--violet-strong); color: var(--t1); }
+.seg2 button:active { filter: brightness(1.25); }
 
 /* ---------------------------------------------------------------- start screen */
 .home {
