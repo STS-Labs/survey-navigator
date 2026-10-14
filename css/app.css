@@ -145,7 +145,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .car.paused svg { filter: none; }
 
 /* map credits: a small (i) under the sound button */
-.maplibregl-ctrl-top-right { top: calc(var(--st) + 140px); right: calc(var(--sr) + 26px); }
+.maplibregl-ctrl-top-right { top: calc(var(--st) + 202px); right: calc(var(--sr) + 26px); }
 .maplibregl-ctrl-top-right .maplibregl-ctrl { margin: 0; }
 .maplibregl-ctrl-attrib.maplibregl-compact { min-height: 24px; background: var(--glass); border: 1px solid var(--hair); color: var(--t2); font: 400 11px/1.4 var(--font); }
 .maplibregl-ctrl-attrib a { color: var(--t2); }
@@ -236,7 +236,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @media (orientation: landscape) and (max-height: 560px) {
   .top { top: calc(var(--st) + 12px); left: calc(var(--sl) + 8px); right: auto; width: min(300px, 40vw); }
   .side { top: calc(var(--st) + 12px); }
-  .maplibregl-ctrl-top-right { top: calc(var(--st) + 144px); }
+  .maplibregl-ctrl-top-right { top: calc(var(--st) + 206px); }
   .bottom, .dock { left: calc(var(--sl) + 16px); right: auto; width: min(361px, 46vw); }
   .fade { height: calc(var(--sb) + 130px); }
 }

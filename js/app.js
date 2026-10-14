@@ -5,7 +5,7 @@ import { STR, speech } from './i18n.js';
 import { arrowSvg, UI, CAR_SVG } from './icons.js';
 import { SURVEY_DAYS, loadSurveyDay } from './days.js';
 
-const APP_VERSION = '1.5 (14 Oct 2026)';
+const APP_VERSION = '1.5.1 (14 Oct 2026)';
 const NET_URL = 'data/tbilisi-net.json';
 const STYLE = 'https://tiles.openfreemap.org/styles/liberty';      // recoloured to the night design on load
 const TILEJSON = 'https://tiles.openfreemap.org/planet';
@@ -843,6 +843,11 @@ function setPaused(on) {
   paused = on;
   $('pauseCard').hidden = !on;
   if (carMarker) carMarker.getElement().classList.toggle('paused', on);
+  // the button under the sound button: pause while driving, violet "continue" while paused
+  const b = $('btnPause');
+  b.innerHTML = on ? UI.play : UI.pause;
+  b.classList.toggle('glass', !on); b.classList.toggle('accent', on);
+  b.setAttribute('aria-label', on ? T.resumeNav : T.pauseNav);
 }
 
 function pauseNav() {
@@ -871,6 +876,8 @@ function resumeNav() {
   renderGpsChip();
 }
 $('pcResume').onclick = () => resumeNav();
+$('btnPause').onclick = () => { if (paused) resumeNav(); else pauseNav(); };
+setPaused(false);
 
 function closeMenu() { $('sheet').hidden = true; $('sheetBack').hidden = true; }
 $('sheetBack').onclick = closeMenu;

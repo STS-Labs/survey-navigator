@@ -27,8 +27,8 @@ The look is the night design approved in Figma on 14 Oct 2026 (file "Survey Navi
 "Design (night)"): navy map, glass cards, violet accent, fonts Inter (numbers, Latin) and Noto Sans
 Georgian, both kept in `fonts/` so they work offline.
 
-The driving screen: the instruction card top left (arrow, distance, what to do, street), menu and sound
-top right, and at the bottom a slim line with the time left (green), km left and the time the day ends
+The driving screen: the instruction card top left (arrow, distance, what to do, street), menu, sound and
+pause top right (while paused the pause button turns violet with a play sign: tap it to continue), and at the bottom a slim line with the time left (green), km left and the time the day ends
 (violet), a GPS dot (green good, amber rough, red poor, grey none) and the progress line (red marks =
 missed stretches). Under the card: **შემდეგ** (the turn right after this one) and **გამოტოვება**, which
 skips the next turn (closed street): the stretch goes on the missed list and the message offers the way back.
