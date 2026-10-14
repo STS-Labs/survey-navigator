@@ -43,7 +43,8 @@ the car, and it also comes back by itself after 20 seconds.
 
 Menu: pause navigation (a break: GPS off, nothing recorded; continue when ready), continue from where I am,
 go back one turn, the missed list, send missed stretches / the driven track as GPX, the whole day on the map,
-practice drive (simulation), stop.
+practice drive (simulation), stop. The menu closes with a tap above it, its Close button, or by pulling
+it down (a short pull springs back).
 
 ## How it works
 

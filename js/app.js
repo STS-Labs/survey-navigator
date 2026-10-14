@@ -5,7 +5,7 @@ import { STR, speech } from './i18n.js';
 import { arrowSvg, UI, CAR_SVG } from './icons.js';
 import { SURVEY_DAYS, loadSurveyDay } from './days.js';
 
-const APP_VERSION = '1.5.1 (14 Oct 2026)';
+const APP_VERSION = '1.5.2 (14 Oct 2026)';
 const NET_URL = 'data/tbilisi-net.json';
 const STYLE = 'https://tiles.openfreemap.org/styles/liberty';      // recoloured to the night design on load
 const TILEJSON = 'https://tiles.openfreemap.org/planet';
@@ -879,15 +879,71 @@ $('pcResume').onclick = () => resumeNav();
 $('btnPause').onclick = () => { if (paused) resumeNav(); else pauseNav(); };
 setPaused(false);
 
-function closeMenu() { $('sheet').hidden = true; $('sheetBack').hidden = true; }
-$('sheetBack').onclick = closeMenu;
+// The menu sheet slides up from the bottom; it closes with a tap outside it, its Close button,
+// or a pull down (from the handle, or anywhere while the list is scrolled to its top)
+let sheetTimer = null;
+function sheetMotion(transform, opacity, ms) {
+  const sh = $('sheet'), back = $('sheetBack');
+  sh.style.transition = ms ? `transform ${ms}ms cubic-bezier(.2, .8, .2, 1)` : 'none';
+  back.style.transition = ms ? `opacity ${ms}ms` : 'none';
+  sh.style.transform = transform; back.style.opacity = opacity;
+}
+function showSheet() {
+  const sh = $('sheet');
+  clearTimeout(sheetTimer);
+  if (sh.hidden) {
+    sh.hidden = false; $('sheetBack').hidden = false;
+    sheetMotion('translateY(100%)', '0', 0);
+    sh.getBoundingClientRect();                       // start from below the screen
+  }
+  sheetMotion('', '', 240);
+}
+function closeMenu() {
+  const sh = $('sheet');
+  if (sh.hidden) return;
+  sheetMotion('translateY(100%)', '0', 200);
+  clearTimeout(sheetTimer);
+  sheetTimer = setTimeout(() => { sh.hidden = true; $('sheetBack').hidden = true; sheetMotion('', '', 0); }, 200);
+}
+$('sheetBack').onclick = () => closeMenu();
+
+(function pullDownToClose() {
+  const sh = $('sheet');
+  let y0 = 0, t0 = 0, dy = 0, may = false, pulling = false;
+  sh.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { may = false; return; }
+    y0 = e.touches[0].clientY; t0 = performance.now(); dy = 0; pulling = false;
+    may = sh.scrollTop <= 0 || !!e.target.closest('.grab-zone');
+  }, { passive: true });
+  sh.addEventListener('touchmove', (e) => {
+    if (!may || e.touches.length !== 1) return;
+    const d = e.touches[0].clientY - y0;
+    if (!pulling) {
+      if (d < -6) { may = false; return; }             // pushing up: the list scrolls as usual
+      if (d < 6) return;
+      pulling = true;
+    }
+    e.preventDefault();                                // the sheet follows the finger instead of the list scrolling
+    dy = Math.max(0, d);
+    sheetMotion(`translateY(${dy}px)`, String(Math.max(0, 1 - dy / sh.offsetHeight)), 0);
+  }, { passive: false });
+  const end = () => {
+    if (!pulling) return;
+    pulling = false;
+    const fast = dy / Math.max(1, performance.now() - t0) > 0.6;
+    if (dy > Math.min(140, sh.offsetHeight * 0.25) || (fast && dy > 30)) closeMenu();
+    else sheetMotion('', '', 200);                     // a small pull springs back
+  };
+  sh.addEventListener('touchend', end);
+  sh.addEventListener('touchcancel', end);
+})();
 
 function openMenu() {
   if (!nav) return;
   const c = nav.coverage();
   cov = c;
   const sh = $('sheet');
-  sh.innerHTML = `<div class="grab"></div>
+  sh.innerHTML = `<div class="grab-zone"><div class="grab"></div></div>
     ${paused ? `<button class="item accent" id="mResume">${UI.play}<span>${T.resumeNav}</span></button>` : `<button class="item accent" id="mPause">${UI.pause}<span>${T.pauseNav}</span></button>`}
     <button class="item" id="mHere">${UI.gps}<span>${T.fromHere}</span></button>
     <button class="item" id="mBack">${T.backTurn}</button>
@@ -899,7 +955,7 @@ function openMenu() {
     <button class="item" id="mSim">${sim ? T.stopSim : T.simulate}</button>
     <button class="item danger" id="mEnd">${T.endNav}</button>
     <button class="item" id="mClose">${T.close}</button>`;
-  sh.hidden = false; $('sheetBack').hidden = false;
+  showSheet();
   if (paused) $('mResume').onclick = () => { closeMenu(); resumeNav(); };
   else $('mPause').onclick = () => { closeMenu(); pauseNav(); };
   $('mBack').onclick = () => { nav.jump(-1); closeMenu(); refreshCoverage(true); };
@@ -909,7 +965,7 @@ function openMenu() {
   $('mAll').onclick = () => { settings.showAll = !settings.showAll; saveSettings(); showWholeDay(); openMenu(); };
   $('mSim').onclick = () => { closeMenu(); if (paused) setPaused(false); if (sim) stopSim(true); else startSim(); };
   $('mEnd').onclick = () => { closeMenu(); stopNav(); };
-  $('mClose').onclick = closeMenu;
+  $('mClose').onclick = () => closeMenu();
 }
 
 /* ------------------------------------------------------------------ files to send back */

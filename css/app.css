@@ -160,8 +160,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   position: fixed; z-index: 21; left: 0; right: 0; bottom: 0; max-height: 86vh; overflow: auto; -webkit-overflow-scrolling: touch;
   background: var(--bg-app); border: 1px solid var(--hair); border-bottom: 0; border-radius: 28px 28px 0 0;
   padding: 12px calc(var(--sr) + 16px) calc(var(--sb) + 16px) calc(var(--sl) + 16px);
+  overscroll-behavior: contain; will-change: transform;
 }
-.sheet .grab { width: 40px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .18); margin: 0 auto 14px; }
+.sheet .grab-zone { margin: -12px 0 0; padding: 12px 0 14px; }        /* a bigger place to grab the sheet */
+.sheet .grab { width: 40px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .18); margin: 0 auto; }
 .sheet h3 { margin: 18px 4px 6px; font: 600 13px/1.3 var(--font); color: var(--t3); }
 .sheet .item {
   display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 16px; margin: 0 0 8px;
