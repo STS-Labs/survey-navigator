@@ -3,8 +3,9 @@ import { prepare, Navigator, slice, pointAt, hashText, bearing, angleDiff } from
 import { SimCar } from './sim.js';
 import { STR, speech } from './i18n.js';
 import { arrowSvg } from './icons.js';
+import { SURVEY_DAYS, loadSurveyDay } from './days.js';
 
-const APP_VERSION = '1.1 (13 Oct 2026)';
+const APP_VERSION = '1.3 (14 Oct 2026)';
 const NET_URL = 'data/tbilisi-net.json';
 const STYLE = { light: 'https://tiles.openfreemap.org/styles/liberty', dark: 'https://tiles.openfreemap.org/styles/dark' };
 const TILEJSON = 'https://tiles.openfreemap.org/planet';
@@ -43,6 +44,7 @@ let sim = null, simTimer = null, simMult = 4, simClock = 0, simFed = -1, simBack
 let lastSnap = null, lastRawFix = null, lastFixReal = 0, cov = null, covAt = 0, saveAt = 0, traceAt = 0;
 let trace = [], moving = { secs: 0, dist: 0, prev: null };
 let previewIdx = 0, toastTimer = null;
+let dayPickerOpen = false;
 
 /* ------------------------------------------------------------------ street map + route */
 
@@ -105,9 +107,10 @@ function renderHome(msg = '') {
   h.hidden = false; $('navUi').hidden = true; $('previewUi').hidden = true;
   const brand = `<div class="brand"><img src="icons/icon.svg" alt=""><div><h1>${T.appName}</h1><p>${T.tagline}</p></div></div>`;
   const how = `<div class="card"><b>${T.howTitle}</b><ol class="how">${T.how.map((s) => `<li>${esc(s)}</li>`).join('')}</ol><div class="note">${T.keepOn}</div></div>`;
-  const err = msg ? `<div class="err">${esc(msg)}</div>` : '';
+  const err = msg ? `<div class="err" role="alert">${esc(msg)}</div>` : '';
+  const dayPicker = dayPickerMarkup();
   if (!day) {
-    h.innerHTML = `<div class="wrap">${brand}<div class="card"><button class="btn primary" id="hOpen">${T.openFile}</button>${err}</div>${how}${settingsBlock()}<p class="note">${T.about} · ${T.version} ${APP_VERSION}</p></div>`;
+    h.innerHTML = `<div class="wrap">${brand}<div class="card">${dayPicker}<button class="btn" id="hOpen">${T.openFile}</button>${err}</div>${how}${settingsBlock()}<p class="note">${T.about} · ${T.version} ${APP_VERSION}</p></div>`;
   } else {
     const r = day.route, prog = savedProgress();
     const started = prog && prog.along > 20;
@@ -126,6 +129,7 @@ function renderHome(msg = '') {
         <button class="btn primary" id="hStart">${started ? T.continueNav : T.start}</button>
         <button class="btn" id="hPreview">${T.preview}</button>
         ${started ? `<button class="btn quiet" id="hRestart">${T.restart}</button>` : ''}
+        ${dayPicker}
         <button class="btn quiet" id="hOpen">${T.openAnother}</button>
         ${err}
       </div>${settingsBlock()}${how}<p class="note">${T.about} · ${T.version} ${APP_VERSION}</p></div>`;
@@ -135,7 +139,36 @@ function renderHome(msg = '') {
     if (started) $('hRestart').onclick = () => { if (confirm(T.restartConfirm)) startNav({ restart: true }); };
   }
   $('hOpen').onclick = () => $('file').click();
+  $('hChooseDay').onclick = () => {
+    dayPickerOpen = !dayPickerOpen;
+    $('dayChoices').hidden = !dayPickerOpen;
+    $('hChooseDay').setAttribute('aria-expanded', String(dayPickerOpen));
+  };
+  h.querySelectorAll('[data-day]').forEach((button) => {
+    button.onclick = () => chooseSurveyDay(Number(button.dataset.day));
+  });
   wireSettings(h, () => renderHome());
+}
+
+function dayPickerMarkup() {
+  return `<button class="btn ${day ? '' : 'primary'}" id="hChooseDay" aria-expanded="${dayPickerOpen}" aria-controls="dayChoices">${T.chooseDay}</button>
+    <div class="day-picker" id="dayChoices" role="group" aria-label="${T.chooseDay}" ${dayPickerOpen ? '' : 'hidden'}>
+      ${SURVEY_DAYS.map(({ number }) => `<button class="btn day-option" data-day="${number}">${T.dayNumber(number)}</button>`).join('')}
+    </div>`;
+}
+
+async function chooseSurveyDay(number) {
+  $('home').innerHTML = `<div class="wrap"><div class="card" role="status"><span class="spinner"></span>${T.loadingDay(number)}</div></div>`;
+  try {
+    const text = await loadSurveyDay(number);
+    await openDay(text, true);
+    dayPickerOpen = false;
+    renderHome();
+  } catch (e) {
+    console.error(e);
+    dayPickerOpen = true;
+    renderHome(T.dayLoadError(number));
+  }
 }
 
 function drawMiniMap(cv) {

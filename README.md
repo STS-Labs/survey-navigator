@@ -11,10 +11,14 @@ turn is missed, and keeps a record of what was really driven.
 ## For the driver
 
 1. Open the app's web address in Safari, then Share → Add to Home Screen.
-2. Put the day's GPX on the phone (AirDrop, WhatsApp or Telegram → Save to Files).
-3. Open the app → **Open route file (GPX)** → pick the file. The file stays on the phone.
+2. Open the app → **Choose day** → select **Day 1** through **Day 6**. The matching GPX loads automatically.
+3. To use another route, keep using **Open route file (GPX)** and pick a file from the phone.
 4. Mount the phone, connect the charger, tap **Start navigation**.
    iPhone setting: Display & Brightness → Auto-Lock → Never.
+
+The six supplied daily routes are bundled unchanged in `data/routes/`. They are cached with the app
+after a successful online service-worker installation, so the day picker also works offline once
+that download is complete. Each GPX keeps its own saved progress; choosing another day does not clear it.
 
 On the map: **blue** = the road ahead (bold for the next 300 m), white arrow = the next turn,
 **orange** = the way back after a missed turn, **red dashes** = stretches missed so far.

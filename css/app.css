@@ -181,3 +181,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .pill { left: auto; right: calc(var(--sr) + 12px); bottom: calc(var(--sb) + 16px); }
   .maplibregl-ctrl-bottom-right { bottom: calc(var(--sb) + 4px); }
 }
+
+/* Bundled survey days: keep large touch targets on narrow phone screens. */
+.day-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+.day-picker .day-option { min-height: 54px; margin: 0; font-weight: 650; }
+.day-option:focus-visible, #hChooseDay:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }

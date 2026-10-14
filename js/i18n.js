@@ -7,6 +7,10 @@ export const STR = {
   en: {
     appName: 'Survey Navigator',
     tagline: 'Turn-by-turn for street-coverage routes',
+    chooseDay: 'Choose day',
+    dayNumber: (n) => `Day ${n}`,
+    loadingDay: (n) => `Loading Day ${n}…`,
+    dayLoadError: (n) => `Could not load Day ${n}. Check your connection and try again.`,
     openFile: 'Open route file (GPX)',
     openAnother: 'Open another route',
     start: 'Start navigation',
@@ -18,8 +22,8 @@ export const STR = {
     loadingMap: 'Loading the street map…',
     howTitle: 'How to use',
     how: [
-      'Put the day\'s GPX file on this iPhone (AirDrop, WhatsApp or Telegram → Save to Files).',
-      'Tap “Open route file” and pick it.',
+      'Tap “Choose day” and select Day 1–6 to load its route.',
+      'For a different GPX, tap “Open route file” and choose it from Files.',
       'Mount the phone, connect the charger, tap Start. Keep this page open while driving.',
     ],
     stats: (kmT, turns) => `${kmT} km · ${turns} instructions`,
@@ -99,6 +103,10 @@ export const STR = {
   ka: {
     appName: 'Survey Navigator',
     tagline: 'ნავიგაცია ქუჩების სრული აღწერის მარშრუტებისთვის',
+    chooseDay: 'დღის არჩევა',
+    dayNumber: (n) => `დღე ${n}`,
+    loadingDay: (n) => `იტვირთება დღე ${n}…`,
+    dayLoadError: (n) => `დღე ${n} ვერ ჩაიტვირთა. შეამოწმეთ ინტერნეტკავშირი და სცადეთ ხელახლა.`,
     openFile: 'მარშრუტის ფაილის გახსნა (GPX)',
     openAnother: 'სხვა მარშრუტის გახსნა',
     start: 'ნავიგაციის დაწყება',
@@ -110,8 +118,8 @@ export const STR = {
     loadingMap: 'ქუჩების რუკა იტვირთება…',
     howTitle: 'როგორ გამოვიყენოთ',
     how: [
-      'დღის GPX ფაილი გადმოიტანეთ ამ iPhone-ზე (AirDrop, WhatsApp ან Telegram → Save to Files).',
-      'დააჭირეთ „მარშრუტის ფაილის გახსნა“ და აირჩიეთ ფაილი.',
+      'დააჭირეთ „დღის არჩევა“ და აირჩიეთ დღე 1–6 მარშრუტის ჩასატვირთად.',
+      'სხვა GPX ფაილისთვის დააჭირეთ „მარშრუტის ფაილის გახსნა“ და აირჩიეთ ფაილი.',
       'დაამაგრეთ ტელეფონი, შეაერთეთ დამტენი და დააჭირეთ დაწყებას. მგზავრობისას ეს გვერდი ღია დატოვეთ.',
     ],
     stats: (kmT, turns) => `${kmT} კმ · ${turns} მითითება`,
