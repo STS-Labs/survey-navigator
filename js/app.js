@@ -153,12 +153,13 @@ function renderHome(msg = '') {
 function dayPickerMarkup() {
   return `<button class="btn ${day ? '' : 'primary'}" id="hChooseDay" aria-expanded="${dayPickerOpen}" aria-controls="dayChoices">${T.chooseDay}</button>
     <div class="day-picker" id="dayChoices" role="group" aria-label="${T.chooseDay}" ${dayPickerOpen ? '' : 'hidden'}>
-      ${SURVEY_DAYS.map(({ number }) => `<button class="btn day-option" data-day="${number}">${T.dayNumber(number)}</button>`).join('')}
+      ${SURVEY_DAYS.map(({ number, name }) => `<button class="btn day-option" data-day="${number}">${name ? esc(name) : T.dayNumber(number)}</button>`).join('')}
     </div>`;
 }
 
 async function chooseSurveyDay(number) {
-  $('home').innerHTML = `<div class="wrap"><div class="card" role="status"><span class="spinner"></span>${T.loadingDay(number)}</div></div>`;
+  const name = SURVEY_DAYS.find((entry) => entry.number === number)?.name;
+  $('home').innerHTML = `<div class="wrap"><div class="card" role="status"><span class="spinner"></span>${name ? `${T.loading} ${esc(name)}` : T.loadingDay(number)}</div></div>`;
   try {
     const text = await loadSurveyDay(number);
     await openDay(text, true);
@@ -167,7 +168,7 @@ async function chooseSurveyDay(number) {
   } catch (e) {
     console.error(e);
     dayPickerOpen = true;
-    renderHome(T.dayLoadError(number));
+    renderHome(name ? `${T.readError} ${name}` : T.dayLoadError(number));
   }
 }
 
