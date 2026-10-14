@@ -17,7 +17,10 @@ turn is missed, and keeps a record of what was really driven.
 3. Mount the phone, connect the charger, tap **ნავიგაციის დაწყება** (start navigation).
    iPhone setting: Display & Brightness → Auto-Lock → Never.
 
-The screens are in Georgian only; the spoken instructions are in English only.
+The screens are in Georgian only. The spoken instructions are recorded in Georgian (40 short clips in
+`audio/ka/`, joined like "200 მეტრში" + "მოუხვიეთ მარჯვნივ"; the list is in `js/voice.js`). If a clip is
+missing, the iPhone's English voice says that line instead. On iPhones with iOS 16.4 or newer the voice
+also plays with the ring / silent switch on silent.
 
 The six supplied daily routes are bundled unchanged in `data/routes/`. They are cached with the app
 after a successful online service-worker installation, so the day picker also works offline once

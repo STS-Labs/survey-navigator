@@ -4,8 +4,9 @@ import { SimCar } from './sim.js';
 import { STR, speech } from './i18n.js';
 import { arrowSvg, UI, CAR_SVG } from './icons.js';
 import { SURVEY_DAYS, loadSurveyDay } from './days.js';
+import { VOICE_DIR, VOICE_CLIPS, clipsFor, gapAfter } from './voice.js';
 
-const APP_VERSION = '1.5.2 (14 Oct 2026)';
+const APP_VERSION = '1.5.3 (14 Oct 2026)';
 const NET_URL = 'data/tbilisi-net.json';
 const STYLE = 'https://tiles.openfreemap.org/styles/liberty';      // recoloured to the night design on load
 const TILEJSON = 'https://tiles.openfreemap.org/planet';
@@ -510,7 +511,7 @@ function tick(now) {
 
 function startNav({ restart = false, along = null }) {
   unlockSound();
-  say(speech(settings.voice, { type: 'go' }), true);
+  speak({ type: 'go' }, true);
   if (restart) { store.del(K.prog(day.hash)); store.del(K.trace(day.hash)); trace = []; nav = makeNav(false); }
   else if (!nav) nav = makeNav(true);
   nav.start(along ?? nav.along);
@@ -651,16 +652,15 @@ function handleFix(fix) {
 }
 
 function onEvent(e) {
-  const text = speech(settings.voice, e);
-  if (e.type === 'prompt') { if (settings.voice === 'beep') beep(e.stage === 'near' ? 2 : 1); else say(text); return; }
-  if (e.type === 'off' || e.type === 'start' || e.type === 'resume') { say(text); beep(1); }
-  if (e.type === 'rejoin') { say(text); toast(T.rejoined); refreshCoverage(true); }
+  if (e.type === 'prompt') { if (settings.voice === 'beep') beep(e.stage === 'near' ? 2 : 1); else speak(e); return; }
+  if (e.type === 'off' || e.type === 'start' || e.type === 'resume') { speak(e); beep(1); }
+  if (e.type === 'rejoin') { speak(e); toast(T.rejoined); refreshCoverage(true); }
   if (e.type === 'skip') {
-    say(text);
+    speak(e);
     toast(T.skipped(T.dist(e.meters)), T.goBack, () => { if (nav.undoSkip()) rerender(nav.snapshot()); });
     refreshCoverage(true);
   }
-  if (e.type === 'done') { say(text); refreshCoverage(true); saveProgress(); setTimeout(openMenu, 1500); }
+  if (e.type === 'done') { speak(e); refreshCoverage(true); saveProgress(); setTimeout(openMenu, 1500); }
 }
 
 function kindText(m) {
@@ -855,8 +855,8 @@ function pauseNav() {
   if (sim) stopSim(false);
   stopGps(); saveProgress(); saveTrace(); hideGpsHelp();
   setPaused(true);
-  try { speechSynthesis.cancel(); } catch { /* no speech */ }
-  say(speech(settings.voice, { type: 'paused' }));
+  stopVoice();
+  speak({ type: 'paused' });
   if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
   setCard({ tone: 'grey', tag: T.tagPaused, icon: UI.pause, instr: day.name, street: T.pausedTitle });
   $('thenChip').hidden = true; $('btnSkip').hidden = true;
@@ -871,7 +871,7 @@ function resumeNav() {
   nav.start(nav.along);                   // finds the car again; if it is elsewhere, the way back to where it stopped
   gps.started = Date.now(); gps.lastAt = 0; gps.lastGoodAt = 0;
   renderWaiting(T.waitingGps);
-  unlockSound(); say(speech(settings.voice, { type: 'resumed' }));
+  unlockSound(); speak({ type: 'resumed' });
   startGps(); keepAwake(); setFollow(true);
   renderGpsChip();
 }
@@ -1035,9 +1035,55 @@ function pickVoice(code) {
 
 function unlockSound() {
   try {
+    // iPhone: speak even with the ring / silent switch on silent (iOS 16.4+)
+    if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback';
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
+    loadVoice();
   } catch { /* no audio */ }
+}
+
+// The recorded Georgian voice (js/voice.js): the clips are read once, then joined for each instruction
+const voiceBuf = new Map();
+let voiceLoading = null, voiceNodes = [], voiceLog = [];
+function loadVoice() {
+  if (voiceLoading || !audioCtx) return voiceLoading;
+  voiceLoading = Promise.all(VOICE_CLIPS.map(async (name) => {
+    try {
+      const r = await fetch(VOICE_DIR + name + '.m4a');
+      if (r.ok) voiceBuf.set(name, await audioCtx.decodeAudioData(await r.arrayBuffer()));
+    } catch (e) { console.warn('voice clip', name, e); }
+  }));
+  return voiceLoading;
+}
+function stopVoice() {
+  for (const s of voiceNodes) { try { s.stop(); } catch { /* already over */ } }
+  voiceNodes = [];
+  try { speechSynthesis.cancel(); } catch { /* no speech */ }
+}
+function playClips(names) {
+  if (!audioCtx || !names || !names.every((n) => voiceBuf.has(n))) return false;
+  stopVoice();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  let t = audioCtx.currentTime + 0.05;
+  names.forEach((n, k) => {
+    const s = audioCtx.createBufferSource();
+    s.buffer = voiceBuf.get(n); s.connect(audioCtx.destination); s.start(t);
+    voiceNodes.push(s);
+    t += s.buffer.duration + gapAfter(names, k);
+  });
+  voiceLog.push(names.join('+'));
+  return true;
+}
+// Say what goes with a navigator event: the recorded clips, or the English voice when a clip is missing
+async function speak(e, force = false) {
+  if (settings.voice === 'off' || settings.voice === 'beep' || (!force && settings.muted)) return;
+  const names = clipsFor(e);
+  if (names && audioCtx) {
+    if (!names.every((n) => voiceBuf.has(n))) await Promise.race([loadVoice(), new Promise((r) => setTimeout(r, 2000))]);
+    if (playClips(names)) return;
+  }
+  say(speech(settings.voice, e), force);
 }
 
 function beep(n = 1) {
@@ -1165,6 +1211,7 @@ window.__sn = {
   pause: () => pauseNav(),
   resume: () => resumeNav(),
   get follow() { return follow; }, get paused() { return paused; },
+  get voice() { return { loaded: voiceBuf.size, log: voiceLog.slice() }; },
   snap: () => lastSnap && { mode: lastSnap.mode, along: lastSnap.along, next: lastSnap.next && { kind: lastSnap.next.m.kind, dist: lastSnap.next.dist }, back: !!lastSnap.back },
   coverage: () => nav && nav.coverage(),
   feed: (fix) => handleFix(fix),

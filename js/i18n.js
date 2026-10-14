@@ -1,5 +1,6 @@
-// Words on screen and spoken prompts. Since 1.4 the screens are Georgian only and the voice is English only;
-// the English screen text and the other voices are kept for the tests and for later.
+// Words on screen and spoken prompts. Since 1.4 the screens are Georgian only. Since 1.5.3 the voice is the
+// recorded Georgian clips (js/voice.js, audio/ka/); the English sentences below are only the fallback when a
+// clip is missing. The English screen text and the other voices are kept for the tests and for later.
 
 const km = (m, unitM, unitKm) => (m < 950 ? `${Math.max(0, Math.round(m / 10) * 10)} ${unitM}` : `${(m / 1000).toFixed(1)} ${unitKm}`);
 
@@ -222,7 +223,7 @@ export const STR = {
 const ORD_EN = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth'];
 const ORD_RU = ['первый', 'второй', 'третий', 'четвёртый', 'пятый', 'шестой', 'седьмой', 'восьмой'];
 
-function spokenMeters(m) {
+export function spokenMeters(m) {
   if (m < 100) return Math.max(10, Math.round(m / 10) * 10);
   if (m < 500) return Math.round(m / 50) * 50;
   return Math.round(m / 100) * 100;

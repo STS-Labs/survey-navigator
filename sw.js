@@ -1,7 +1,17 @@
 // Offline support: the app and the street network are kept on the phone, and so is every map tile it
 // has shown (plus the tiles around the loaded route), so a dead spot in the city does not stop navigation.
-const APP = 'sn-app-10';
+const APP = 'sn-app-11';
 const MAP = 'sn-map-1';
+// The recorded voice, kept for offline use (the same list as js/voice.js)
+const VOICE = [
+  'dist-070', 'dist-080', 'dist-090', 'dist-100', 'dist-150', 'dist-200',
+  'dist-250', 'dist-300', 'dist-350', 'turn-right', 'turn-left', 'keep-right',
+  'keep-left', 'u-turn', 'sharp-left', 'straight-on', 'sharp-right', 'bear-right',
+  'bear-left', 'route-ends', 'back-on-route-ahead', 'roundabout-exit-1', 'roundabout-exit-2', 'roundabout-exit-3',
+  'roundabout-exit-4', 'roundabout-exit-5', 'roundabout-exit-6', 'roundabout-exit-7', 'roundabout-exit-8', 'roundabout-other',
+  'then', 'msg-started', 'msg-off-route', 'msg-back-on-route', 'msg-skipped', 'msg-to-start',
+  'msg-to-where-stopped', 'msg-paused', 'msg-resumed', 'msg-route-complete',
+];
 const SHELL = [
   './', 'index.html', 'css/app.css', 'js/app.js', 'js/core.js', 'js/sim.js', 'js/i18n.js', 'js/icons.js',
   'vendor/maplibre-gl-4.7.1/maplibre-gl.js', 'vendor/maplibre-gl-4.7.1/maplibre-gl.css',
@@ -14,7 +24,8 @@ const SHELL = [
   'data/routes/day_06_nav.gpx',
   'data/routes/zuka-testdrive.gpx',
   'data/tbilisi-net.json', 'manifest.webmanifest', 'icons/logo.png', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
-  'fonts/inter-latin.woff2', 'fonts/noto-sans-georgian.woff2',
+  'fonts/inter-latin.woff2', 'fonts/noto-sans-georgian.woff2', 'js/voice.js',
+  ...VOICE.map((n) => `audio/ka/${n}.m4a`),
 ];
 
 self.addEventListener('install', (e) => {
