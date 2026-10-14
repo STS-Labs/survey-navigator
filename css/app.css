@@ -68,12 +68,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .round svg { width: 26px; height: 26px; }
 .round.on { background: var(--green); color: #fff; border-color: var(--green); }
-
-.pill {
-  position: fixed; z-index: 11; left: calc(var(--sl) + 12px); bottom: calc(var(--sb) + 112px);
-  padding: 12px 18px; border-radius: 999px; border: 0; background: var(--panel); color: var(--ink);
-  font-weight: 650; box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
-}
+.round.alert { background: var(--blue); color: #fff; border-color: var(--blue); }   /* map moved away from the car */
 .toast {
   position: fixed; z-index: 12; left: 50%; transform: translateX(-50%); bottom: calc(var(--sb) + 116px);
   width: min(560px, calc(100% - 24px)); display: flex; align-items: center; gap: 12px; justify-content: space-between;
@@ -88,6 +83,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .car { width: 48px; height: 48px; }
 .car svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .4)); }
 .car.off svg circle { fill: #f59e0b; }
+.car.paused svg circle { fill: #9ca3af; }
 
 .gpshelp {
   margin-top: 8px; width: 100%; background: var(--panel); color: var(--ink); border-radius: 16px; padding: 14px 16px;
@@ -97,6 +93,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .gh-text { font-size: 15px; margin-top: 6px; line-height: 1.4; }
 .gh-btns { display: flex; gap: 8px; }
 .gh-btns .btn { flex: 1; padding: 12px 10px; font-size: 16px; }
+.pausecard {
+  margin-top: 8px; width: 100%; background: var(--panel); color: var(--ink); border-radius: 16px; padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .25); pointer-events: auto;
+}
+.pc-text { font-size: 15px; line-height: 1.4; }
+.pausecard .btn { margin-top: 12px; }
 .gpschip { display: inline-flex; align-items: center; gap: 6px; font-weight: 650; }
 .gpschip::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
 .gpschip.good { color: #15803d; } .gpschip.fair { color: #b45309; } .gpschip.poor { color: var(--red); }
@@ -124,20 +126,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .missed-list li { padding: 10px 4px; border-bottom: 1px solid var(--line); font-size: 15px; }
 .missed-list li b { font-weight: 650; }
 
-/* ---------------------------------------------------------------- preview */
-.preview-card {
-  position: fixed; z-index: 10; left: calc(var(--sl) + 8px); right: calc(var(--sr) + 8px); bottom: calc(var(--sb) + 8px);
-  background: var(--panel); border-radius: 18px; padding: 12px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
-}
-.p-head { display: flex; gap: 12px; align-items: center; }
-.p-icon { width: 64px; height: 64px; flex: none; color: #fff; background: var(--green); border-radius: 14px; padding: 6px; }
-.p-icon svg { width: 100%; height: 100%; display: block; }
-.p-instr { font-size: 20px; font-weight: 700; }
-.p-street { font-size: 16px; color: var(--muted); }
-.p-meta { font-size: 14px; color: var(--muted); margin-top: 2px; }
-.p-btns { display: flex; gap: 8px; margin-top: 10px; }
-.p-btns .btn { flex: 1; }
-
 /* ---------------------------------------------------------------- start screen */
 .home {
   position: fixed; inset: 0; z-index: 30; overflow: auto; -webkit-overflow-scrolling: touch; background: var(--bg);
@@ -161,8 +149,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .btn.primary { background: var(--green); color: #fff; border-color: var(--green); font-size: 19px; padding: 17px 16px; }
 .btn.quiet { background: transparent; }
 .btn:disabled { opacity: .5; }
-.how { margin: 6px 0 0; padding-left: 20px; color: var(--ink); }
-.how li { margin: 6px 0; }
 .note { color: var(--muted); font-size: 14px; margin-top: 10px; }
 .err { color: var(--red); font-weight: 600; margin-top: 8px; }
 .label { font-size: 13px; color: var(--muted); font-weight: 650; margin: 14px 0 6px; }
@@ -178,7 +164,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .b-street { font-size: 16px; }
   .bottom { right: auto; width: min(430px, 48vw); }
   .toast { left: calc(var(--sl) + 8px); transform: none; width: min(430px, 48vw); bottom: calc(var(--sb) + 120px); }
-  .pill { left: auto; right: calc(var(--sr) + 12px); bottom: calc(var(--sb) + 16px); }
   .maplibregl-ctrl-bottom-right { bottom: calc(var(--sb) + 4px); }
 }
 

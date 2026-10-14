@@ -11,10 +11,12 @@ turn is missed, and keeps a record of what was really driven.
 ## For the driver
 
 1. Open the app's web address in Safari, then Share → Add to Home Screen.
-2. Open the app → **Choose day** → select **Day 1** through **Day 6**. The matching GPX loads automatically.
-3. To use another route, keep using **Open route file (GPX)** and pick a file from the phone.
-4. Mount the phone, connect the charger, tap **Start navigation**.
+2. Open the app: the days are listed straight away. Tap the day (**დღე 1** to **დღე 6**); its GPX loads.
+   Another route can still be opened from a file (**მარშრუტის ფაილის გახსნა (GPX)**).
+3. Mount the phone, connect the charger, tap **ნავიგაციის დაწყება** (start navigation).
    iPhone setting: Display & Brightness → Auto-Lock → Never.
+
+The screens are in Georgian only; the spoken instructions are in English only.
 
 The six supplied daily routes are bundled unchanged in `data/routes/`. They are cached with the app
 after a successful online service-worker installation, so the day picker also works offline once
@@ -22,9 +24,12 @@ that download is complete. Each GPX keeps its own saved progress; choosing anoth
 
 On the map: **blue** = the road ahead (bold for the next 300 m), white arrow = the next turn,
 **orange** = the way back after a missed turn, **red dashes** = stretches missed so far.
+The map can be moved and zoomed with the fingers at any time. The re-centre button (bottom left, blue
+while the map is moved away) brings it back to the car; it also comes back by itself after 20 seconds.
 
-Menu: skip to the next turn (closed street), go back one turn, continue from where I am, the missed list,
-send missed stretches / the driven track as GPX, voice and language, practice drive (simulation).
+Menu: pause navigation (a break: GPS off, nothing recorded; continue when ready), skip to the next turn
+(closed street), go back one turn, continue from where I am, the missed list, send missed stretches / the
+driven track as GPX, the whole day on the map, practice drive (simulation), stop.
 
 ## How it works
 

@@ -45,6 +45,9 @@ export function arrowSvg(kind, a = 0, exit = 1) {
       body = `<path d="M18 30 H82" stroke="currentColor" stroke-width="9" stroke-linecap="round" opacity=".55"/>`
         + `<path d="M50 94 L50 46" stroke="currentColor" stroke-width="11" stroke-linecap="round"/>${head(50, 42, 0, -1)}`;
       break;
+    case 'pause':
+      body = '<rect x="27" y="22" width="16" height="56" rx="5" fill="currentColor"/><rect x="57" y="22" width="16" height="56" rx="5" fill="currentColor"/>';
+      break;
     case 'direction': {             // no street path available: point towards the target
       const dx = Math.sin(a * DEG), dy = -Math.cos(a * DEG);
       body = `<path d="M${f(50 - 30 * dx)} ${f(50 - 30 * dy)} L${f(50 + 22 * dx)} ${f(50 + 22 * dy)}" stroke="currentColor" stroke-width="11" stroke-linecap="round"/>${head(50 + 22 * dx, 50 + 22 * dy, dx, dy, 13)}`;

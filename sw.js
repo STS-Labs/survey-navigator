@@ -1,6 +1,6 @@
 // Offline support: the app and the street network are kept on the phone, and so is every map tile it
 // has shown (plus the tiles around the loaded route), so a dead spot in the city does not stop navigation.
-const APP = 'sn-app-6';
+const APP = 'sn-app-7';
 const MAP = 'sn-map-1';
 const SHELL = [
   './', 'index.html', 'css/app.css', 'js/app.js', 'js/core.js', 'js/sim.js', 'js/i18n.js', 'js/icons.js',

@@ -1,5 +1,5 @@
-// Words on screen (Georgian, English) and spoken prompts (English, Russian, Georgian if the phone has a
-// Georgian voice; iPhones currently do not).
+// Words on screen and spoken prompts. Since 1.4 the screens are Georgian only and the voice is English only;
+// the English screen text and the other voices are kept for the tests and for later.
 
 const km = (m, unitM, unitKm) => (m < 950 ? `${Math.max(0, Math.round(m / 10) * 10)} ${unitM}` : `${(m / 1000).toFixed(1)} ${unitKm}`);
 
@@ -95,10 +95,14 @@ export const STR = {
       coarse_computer: 'A computer finds itself roughly (by Wi-Fi), not well enough to navigate. Use the app on the iPhone in the car, or try the practice drive here.',
     },
     retry: 'Try again', practice: 'Practice drive',
-    gpsAcc: (m) => `GPS ±${m} m`, gpsNone: 'No GPS yet', gpsWait: 'GPS: waiting for an update',
+    gpsAcc: (m) => `GPS ±${m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`}`, gpsNone: 'No GPS yet', gpsWait: 'GPS: waiting for an update',
+    gpsOff: 'GPS off',
+    pauseNav: 'Pause navigation', resumeNav: 'Continue navigation', pausedTitle: 'Navigation paused',
+    pausedText: 'GPS is off: nothing is recorded during the pause. Tap Continue navigation when you are ready.',
+    recenterLabel: 'Back to the car',
     waitingPrecise: (a) => `Waiting for precise GPS (now ±${a})`,
     version: 'Version',
-    about: 'Street data © OpenStreetMap contributors. The route file stays on this phone.',
+    about: 'Street data © OpenStreetMap contributors.',
   },
   ka: {
     appName: 'Survey Navigator',
@@ -192,10 +196,14 @@ export const STR = {
       coarse_computer: 'კომპიუტერი მდებარეობას უხეშად ადგენს (Wi-Fi-ით), ნავიგაციისთვის ეს საკმარისი არ არის. გამოიყენეთ აპი iPhone-ზე მანქანაში, ან აქ სცადეთ სავარჯიშო მგზავრობა.',
     },
     retry: 'თავიდან ცდა', practice: 'სავარჯიშო მგზავრობა',
-    gpsAcc: (m) => `GPS ±${m} მ`, gpsNone: 'GPS ჯერ არ არის', gpsWait: 'GPS: განახლების მოლოდინი',
+    gpsAcc: (m) => `GPS ±${m < 1000 ? `${Math.round(m)} მ` : `${(m / 1000).toFixed(1)} კმ`}`, gpsNone: 'GPS ჯერ არ არის', gpsWait: 'GPS: განახლების მოლოდინი',
+    gpsOff: 'GPS გამორთულია',
+    pauseNav: 'ნავიგაციის პაუზა', resumeNav: 'ნავიგაციის გაგრძელება', pausedTitle: 'ნავიგაცია დაპაუზებულია',
+    pausedText: 'GPS გამორთულია: პაუზის დროს არაფერი იწერება. როცა მზად იქნებით, დააჭირეთ „ნავიგაციის გაგრძელებას“.',
+    recenterLabel: 'მანქანასთან დაბრუნება',
     waitingPrecise: (a) => `ზუსტი GPS-ის მოლოდინი (ახლა ±${a})`,
     version: 'ვერსია',
-    about: 'ქუჩების მონაცემები © OpenStreetMap contributors. მარშრუტის ფაილი ამ ტელეფონზე რჩება.',
+    about: 'ქუჩების მონაცემები © OpenStreetMap contributors.',
   },
 };
 
@@ -227,6 +235,8 @@ const SAY = {
     resume: 'Drive back to where you stopped.',
     done: 'Route complete.',
     go: 'Navigation started.',
+    paused: 'Navigation paused.',
+    resumed: 'Navigation resumed.',
   },
   ru: {
     act: {
@@ -244,6 +254,8 @@ const SAY = {
     resume: 'Вернитесь туда, где вы остановились.',
     done: 'Маршрут завершён.',
     go: 'Навигация началась.',
+    paused: 'Навигация на паузе.',
+    resumed: 'Навигация продолжена.',
   },
   ka: {
     act: {
@@ -261,6 +273,8 @@ const SAY = {
     resume: 'დაბრუნდით იქ, სადაც გაჩერდით.',
     done: 'მარშრუტი დასრულდა.',
     go: 'ნავიგაცია დაიწყო.',
+    paused: 'ნავიგაცია დაპაუზდა.',
+    resumed: 'ნავიგაცია გაგრძელდა.',
   },
 };
 
@@ -283,6 +297,8 @@ export function speech(lang, e) {
     case 'resume': return L.resume;
     case 'done': return L.done;
     case 'go': return L.go;
+    case 'paused': return L.paused;
+    case 'resumed': return L.resumed;
     default: return '';
   }
 }

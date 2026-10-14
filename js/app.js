@@ -5,7 +5,7 @@ import { STR, speech } from './i18n.js';
 import { arrowSvg } from './icons.js';
 import { SURVEY_DAYS, loadSurveyDay } from './days.js';
 
-const APP_VERSION = '1.3 (14 Oct 2026)';
+const APP_VERSION = '1.4 (14 Oct 2026)';
 const NET_URL = 'data/tbilisi-net.json';
 const STYLE = { light: 'https://tiles.openfreemap.org/styles/liberty', dark: 'https://tiles.openfreemap.org/styles/dark' };
 const TILEJSON = 'https://tiles.openfreemap.org/planet';
@@ -24,12 +24,10 @@ const store = {
 };
 const K = { route: 'sn1.route', settings: 'sn1.settings', prog: (h) => 'sn1.prog.' + h, trace: (h) => 'sn1.trace.' + h };
 
-const settings = Object.assign({
-  lang: (navigator.language || '').toLowerCase().startsWith('ka') ? 'ka' : 'en',
-  voice: 'en', showAll: false, muted: false,
-}, store.get(K.settings, {}));
+// Screens in Georgian, spoken instructions in English (there is no choice for either)
+const settings = Object.assign({ showAll: false, muted: false }, store.get(K.settings, {}), { lang: 'ka', voice: 'en' });
 const saveSettings = () => store.set(K.settings, settings);
-let T = STR[settings.lang] || STR.en;
+const T = STR.ka;
 const dark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
 
 /* ------------------------------------------------------------------ app state */
@@ -43,7 +41,7 @@ let watchId = null, wakeLock = null, gpsBlocked = false;
 let sim = null, simTimer = null, simMult = 4, simClock = 0, simFed = -1, simBackup = null;
 let lastSnap = null, lastRawFix = null, lastFixReal = 0, cov = null, covAt = 0, saveAt = 0, traceAt = 0;
 let trace = [], moving = { secs: 0, dist: 0, prev: null };
-let previewIdx = 0, toastTimer = null;
+let toastTimer = null, paused = false, easeUntil = 0;
 let dayPickerOpen = false;
 
 /* ------------------------------------------------------------------ street map + route */
@@ -57,12 +55,12 @@ function loadNetwork() {
   return netPromise;
 }
 
-async function openDay(text, persist = true) {
+async function openDay(text, persist = true, name = null) {
   const netDoc = await loadNetwork();
   const p = prepare(text, netDoc);
-  day = { text, hash: hashText(text), name: p.gpx.name || T.appName, proj: p.proj, net: p.net, route: p.route };
+  day = { text, hash: hashText(text), name: name || p.gpx.name || T.appName, proj: p.proj, net: p.net, route: p.route };
   nav = null; trace = store.get(K.trace(day.hash), []) || [];
-  if (persist) store.set(K.route, { text, at: Date.now() });
+  if (persist) store.set(K.route, { text, name: day.name, at: Date.now() });
   warmOffline(day.route.bbox);
   return day;
 }
@@ -77,40 +75,17 @@ function makeNav(restore = true) {
 
 /* ------------------------------------------------------------------ start screen */
 
-function settingsBlock() {
-  const voices = availableVoiceLangs();
-  const opts = ['en', 'ru', ...(voices.has('ka') ? ['ka'] : []), 'beep', 'off'];
-  return `<div class="card">
-    <div class="label">${T.language}</div>
-    <div class="seg" data-set="lang">${['ka', 'en'].map((l) => `<button data-v="${l}" class="${settings.lang === l ? 'on' : ''}">${l === 'ka' ? 'ქართული' : 'English'}</button>`).join('')}</div>
-    <div class="label">${T.voice}</div>
-    <div class="seg" data-set="voice">${opts.map((v) => `<button data-v="${v}" class="${settings.voice === v ? 'on' : ''}">${T.voiceOpts[v]}</button>`).join('')}</div>
-  </div>`;
-}
-
-function wireSettings(root, after) {
-  root.querySelectorAll('.seg[data-set] button').forEach((b) => {
-    b.onclick = () => {
-      const key = b.parentElement.dataset.set;
-      settings[key] = b.dataset.v; saveSettings();
-      if (key === 'lang') { T = STR[settings.lang]; setLabelLang(); document.documentElement.lang = settings.lang; }
-      if (key === 'voice' && b.dataset.v !== 'off' && b.dataset.v !== 'beep') say(speech(settings.voice, { type: 'go' }), true);
-      if (key === 'voice' && b.dataset.v === 'beep') beep(2);
-      after();
-    };
-  });
-}
-
 function renderHome(msg = '') {
   screen = 'home';
   const h = $('home');
-  h.hidden = false; $('navUi').hidden = true; $('previewUi').hidden = true;
+  h.hidden = false; $('navUi').hidden = true;
+  if (!day) dayPickerOpen = true;                    // nothing loaded: the days are the first thing to see
   const brand = `<div class="brand"><img src="icons/icon.svg" alt=""><div><h1>${T.appName}</h1><p>${T.tagline}</p></div></div>`;
-  const how = `<div class="card"><b>${T.howTitle}</b><ol class="how">${T.how.map((s) => `<li>${esc(s)}</li>`).join('')}</ol><div class="note">${T.keepOn}</div></div>`;
   const err = msg ? `<div class="err" role="alert">${esc(msg)}</div>` : '';
   const dayPicker = dayPickerMarkup();
+  const foot = `<p class="note">${T.about} · ${T.version} ${APP_VERSION}</p>`;
   if (!day) {
-    h.innerHTML = `<div class="wrap">${brand}<div class="card">${dayPicker}<button class="btn" id="hOpen">${T.openFile}</button>${err}</div>${how}${settingsBlock()}<p class="note">${T.about} · ${T.version} ${APP_VERSION}</p></div>`;
+    h.innerHTML = `<div class="wrap">${brand}<div class="card">${dayPicker}<button class="btn" id="hOpen">${T.openFile}</button>${err}</div>${foot}</div>`;
   } else {
     const r = day.route, prog = savedProgress();
     const started = prog && prog.along > 20;
@@ -127,15 +102,13 @@ function renderHome(msg = '') {
         <canvas class="mini-map" id="miniMap"></canvas>
         ${progHtml}
         <button class="btn primary" id="hStart">${started ? T.continueNav : T.start}</button>
-        <button class="btn" id="hPreview">${T.preview}</button>
         ${started ? `<button class="btn quiet" id="hRestart">${T.restart}</button>` : ''}
         ${dayPicker}
         <button class="btn quiet" id="hOpen">${T.openAnother}</button>
         ${err}
-      </div>${settingsBlock()}${how}<p class="note">${T.about} · ${T.version} ${APP_VERSION}</p></div>`;
+      </div>${foot}</div>`;
     drawMiniMap($('miniMap'));
     $('hStart').onclick = () => startNav({});
-    $('hPreview').onclick = () => openPreview(0);
     if (started) $('hRestart').onclick = () => { if (confirm(T.restartConfirm)) startNav({ restart: true }); };
   }
   $('hOpen').onclick = () => $('file').click();
@@ -147,7 +120,6 @@ function renderHome(msg = '') {
   h.querySelectorAll('[data-day]').forEach((button) => {
     button.onclick = () => chooseSurveyDay(Number(button.dataset.day));
   });
-  wireSettings(h, () => renderHome());
 }
 
 function dayPickerMarkup() {
@@ -162,7 +134,7 @@ async function chooseSurveyDay(number) {
   $('home').innerHTML = `<div class="wrap"><div class="card" role="status"><span class="spinner"></span>${name ? `${T.loading} ${esc(name)}` : T.loadingDay(number)}</div></div>`;
   try {
     const text = await loadSurveyDay(number);
-    await openDay(text, true);
+    await openDay(text, true, name || T.dayNumber(number));      // the day's own name, not the English one in the file
     dayPickerOpen = false;
     renderHome();
   } catch (e) {
@@ -230,6 +202,7 @@ function ensureMap() {
   map.on('dragstart', () => setFollow(false));
   map.on('wheel', () => setFollow(false));
   for (const ev of ['zoomstart', 'rotatestart', 'pitchstart']) map.on(ev, (e) => { if (e.originalEvent) setFollow(false); });
+  watchHands(map.getCanvasContainer());
   map.on('error', (e) => console.warn('map:', e && e.error && e.error.message));
   const el = document.createElement('div');
   el.className = 'car';
@@ -351,10 +324,47 @@ function applyPadding() {
 
 function setFollow(on) {
   follow = on;
-  $('recenter').hidden = on || screen !== 'nav';
+  $('btnRecenter').classList.toggle('alert', !on && screen === 'nav');
   clearTimeout(followTimer);
   if (!on) followTimer = setTimeout(() => setFollow(true), 20000);
-  else applyPadding();
+  else { applyPadding(); glideToCar(); }
+}
+
+// Back to the car smoothly (the camera then follows it again)
+function glideToCar() {
+  if (!map || !view.cur || screen !== 'nav') return;
+  const c = view.cur;
+  easeUntil = performance.now() + 700;
+  map.easeTo({ center: [c.lon, c.lat], bearing: c.brg, zoom: c.zoom, pitch: 50, duration: 650 });
+}
+
+// The camera follows the car many times a second, and each move would cancel a finger on the map.
+// So a finger on the map stops the following at once; a real move or a pinch keeps it stopped
+// (the re-centre button lights up), a plain tap gives it back.
+function watchHands(box) {
+  let hold = null;
+  const begin = (x, y, many) => {
+    if (screen !== 'nav') return;
+    hold = { x, y, was: follow, moved: !!many };
+    follow = false;
+    if (many) setFollow(false);
+  };
+  const move = (x, y, many) => {
+    if (!hold || hold.moved) return;
+    if (many || Math.hypot(x - hold.x, y - hold.y) > 8) { hold.moved = true; setFollow(false); }
+  };
+  const end = () => {
+    if (!hold) return;
+    if (!hold.moved && hold.was) setFollow(true);
+    hold = null;
+  };
+  box.addEventListener('touchstart', (e) => { const t = e.touches[0]; if (!hold) begin(t.clientX, t.clientY, e.touches.length > 1); else if (e.touches.length > 1) move(t.clientX, t.clientY, true); }, { passive: true });
+  box.addEventListener('touchmove', (e) => { const t = e.touches[0]; move(t.clientX, t.clientY, e.touches.length > 1); }, { passive: true });
+  box.addEventListener('touchend', (e) => { if (!e.touches.length) end(); }, { passive: true });
+  box.addEventListener('touchcancel', (e) => { if (!e.touches.length) end(); }, { passive: true });
+  box.addEventListener('mousedown', (e) => begin(e.clientX, e.clientY, false));
+  window.addEventListener('mousemove', (e) => move(e.clientX, e.clientY, false));
+  window.addEventListener('mouseup', end);
 }
 
 /* ------------------------------------------------------------------ smooth car + camera */
@@ -371,7 +381,7 @@ function tick(now) {
     const cur = { lon: f.lon + (t.lon - f.lon) * k, lat: f.lat + (t.lat - f.lat) * k, brg: (f.brg + angleDiff(f.brg, t.brg) * k + 360) % 360, zoom: f.zoom + (t.zoom - f.zoom) * k };
     view.cur = cur;
     carMarker.setLngLat([cur.lon, cur.lat]).setRotation(cur.brg);
-    if (follow && screen === 'nav') map.jumpTo({ center: [cur.lon, cur.lat], bearing: cur.brg, zoom: cur.zoom, pitch: 50 });
+    if (follow && screen === 'nav' && now > easeUntil) map.jumpTo({ center: [cur.lon, cur.lat], bearing: cur.brg, zoom: cur.zoom, pitch: 50 });
   }
   requestAnimationFrame(tick);
 }
@@ -384,8 +394,8 @@ function startNav({ restart = false, along = null }) {
   if (restart) { store.del(K.prog(day.hash)); store.del(K.trace(day.hash)); trace = []; nav = makeNav(false); }
   else if (!nav) nav = makeNav(true);
   nav.start(along ?? nav.along);
-  screen = 'nav';
-  $('home').hidden = true; $('previewUi').hidden = true; $('navUi').hidden = false;
+  screen = 'nav'; setPaused(false);
+  $('home').hidden = true; $('navUi').hidden = false;
   renderWaiting(T.waitingGps);
   keepAwake();
   const loaded = ensureMap();                       // creates the map and the car at once
@@ -400,7 +410,7 @@ function startNav({ restart = false, along = null }) {
 
 function stopNav() {
   stopGps(); stopSim(false); saveProgress(); saveTrace();
-  hideGpsHelp();
+  hideGpsHelp(); setPaused(false);
   if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
   renderHome();
 }
@@ -457,7 +467,7 @@ function onPosition(p) {
 
 // Decide what (if anything) the driver needs to be told about the location
 function gpsWatchdog() {
-  if (screen !== 'nav' || sim) { hideGpsHelp(); return; }
+  if (screen !== 'nav' || sim || paused) { hideGpsHelp(); return; }
   const now = Date.now(), running = now - gps.started;
   let problem = null;
   if (gpsBlocked) problem = 'denied';
@@ -485,16 +495,16 @@ function renderGpsChip() {
   const el = $('gpsChip');
   if (!el) return;
   if (sim) { el.className = 'gpschip sim'; el.textContent = T.practice; return; }
+  if (paused) { el.className = 'gpschip none'; el.textContent = T.gpsOff; return; }
   // A phone standing still may report rarely: a reading from the last minute still counts
   const fresh = gps.lastAt && Date.now() - gps.lastAt < 60000;
   const acc = gps.acc;
   el.className = 'gpschip ' + (!gps.lastAt ? 'none' : !fresh ? 'none' : acc <= 20 ? 'good' : acc <= GOOD_ACC ? 'fair' : 'poor');
-  el.textContent = !gps.lastAt ? T.gpsNone : !fresh ? T.gpsWait
-    : T.gpsAcc(acc < 1000 ? Math.round(acc) : (acc / 1000).toFixed(1) + (settings.lang === 'ka' ? ' კ' : ' k'));
+  el.textContent = !gps.lastAt ? T.gpsNone : !fresh ? T.gpsWait : T.gpsAcc(acc);
 }
 
 function handleFix(fix) {
-  if (!nav || screen !== 'nav') return;
+  if (!nav || screen !== 'nav' || paused) return;
   const snap = nav.update(fix);
   lastSnap = snap; lastRawFix = fix;
   const nowReal = performance.now(), gap = lastFixReal ? nowReal - lastFixReal : 1000;
@@ -658,19 +668,8 @@ function showWholeDay() {
 
 /* ------------------------------------------------------------------ buttons while driving */
 
-$('recenter').onclick = () => setFollow(true);
-$('btnOverview').onclick = () => {
-  if (!mapReady || !nav) return;
-  const s = lastSnap || nav.snapshot(), R = day.route, P = day.proj;
-  const coords = s.mode === 'back' && s.back && s.back.path
-    ? slice(s.back.path, P, s.back.pos, s.back.path.total).concat(slice(R, P, s.back.target.along, s.back.target.along + 600))
-    : slice(R, P, s.along, s.along + AHEAD);
-  if (view.cur) coords.push([view.cur.lon, view.cur.lat]);
-  if (coords.length < 2) return;
-  const bb = coords.reduce((b, c) => [Math.min(b[0], c[0]), Math.min(b[1], c[1]), Math.max(b[2], c[0]), Math.max(b[3], c[1])], [180, 90, -180, -90]);
-  setFollow(false);
-  map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], { padding: { top: $('top').offsetHeight + 40, bottom: $('bottom').offsetHeight + 40, left: 40, right: 40 }, bearing: 0, pitch: 0, duration: 600, maxZoom: 17.5 });
-};
+$('btnRecenter').onclick = () => setFollow(true);
+$('btnRecenter').setAttribute('aria-label', T.recenterLabel);
 function renderMute() {
   const off = settings.muted || settings.voice === 'off';
   $('btnMute').innerHTML = off
@@ -691,6 +690,44 @@ function toast(text, btnText, onBtn) {
   toastTimer = setTimeout(() => { $('toast').hidden = true; }, btnText ? 15000 : 4000);
 }
 
+/* ------------------------------------------------------------------ pause (a break: no GPS, no guidance) */
+
+function setPaused(on) {
+  paused = on;
+  $('pauseCard').hidden = !on;
+  if (carMarker) carMarker.getElement().classList.toggle('paused', on);
+}
+
+function pauseNav() {
+  if (screen !== 'nav' || paused || !nav) return;
+  if (sim) stopSim(false);
+  stopGps(); saveProgress(); saveTrace(); hideGpsHelp();
+  setPaused(true);
+  try { speechSynthesis.cancel(); } catch { /* no speech */ }
+  say(speech(settings.voice, { type: 'paused' }));
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  const b = $('banner');
+  b.className = 'banner wait';
+  $('bIcon').innerHTML = arrowSvg('pause'); $('bDist').textContent = '';
+  $('bInstr').textContent = T.pausedTitle; $('bStreet').textContent = day.name;
+  $('thenChip').hidden = true;
+  $('pcText').textContent = T.pausedText; $('pcResume').textContent = T.resumeNav;
+  setLine('man', []); setHead(null);
+  renderGpsChip();
+}
+
+function resumeNav() {
+  if (!paused) return;
+  setPaused(false);
+  nav.start(nav.along);                   // finds the car again; if it is elsewhere, the way back to where it stopped
+  gps.started = Date.now(); gps.lastAt = 0; gps.lastGoodAt = 0;
+  renderWaiting(T.waitingGps);
+  unlockSound(); say(speech(settings.voice, { type: 'resumed' }));
+  startGps(); keepAwake(); setFollow(true);
+  renderGpsChip();
+}
+$('pcResume').onclick = () => resumeNav();
+
 function closeMenu() { $('sheet').hidden = true; $('sheetBack').hidden = true; }
 $('sheetBack').onclick = closeMenu;
 
@@ -700,6 +737,7 @@ function openMenu() {
   cov = c;
   const sh = $('sheet');
   sh.innerHTML = `<div class="grab"></div>
+    ${paused ? `<button class="item" id="mResume">${T.resumeNav}</button>` : `<button class="item" id="mPause">${T.pauseNav}</button>`}
     <button class="item" id="mSkip">${T.skipTurn}</button>
     <button class="item" id="mBack">${T.backTurn}</button>
     <button class="item" id="mHere">${T.fromHere}</button>
@@ -707,20 +745,20 @@ function openMenu() {
     ${c.missed.length ? `<ul class="missed-list">${c.missed.map(([a, b], i) => `<li><b>${i + 1}.</b> ${T.missedAt((a / 1000).toFixed(2), T.dist(b - a))}</li>`).join('')}</ul>` : `<div class="note">${T.missedNone}</div>`}
     <button class="item" id="mShareMissed" ${c.missed.length ? '' : 'disabled'}>${T.shareMissed}</button>
     <button class="item" id="mShareTrack">${T.shareTrack}</button>
-    ${settingsBlock().replace(/^<div class="card">|<\/div>\s*$/g, '')}
     <button class="item" id="mAll">${settings.showAll ? '✓ ' : ''}${T.showAll}</button>
     <button class="item" id="mSim">${sim ? T.stopSim : T.simulate}</button>
     <button class="item danger" id="mEnd">${T.endNav}</button>
     <button class="item" id="mClose">${T.close}</button>`;
   sh.hidden = false; $('sheetBack').hidden = false;
-  wireSettings(sh, () => { renderMute(); openMenu(); if (lastSnap) rerender(lastSnap); });
+  if (paused) $('mResume').onclick = () => { closeMenu(); resumeNav(); };
+  else $('mPause').onclick = () => { closeMenu(); pauseNav(); };
   $('mSkip').onclick = () => { const from = nav.along, to = nav.jump(1); closeMenu(); toast(T.jumped(T.dist(to - from))); refreshCoverage(true); };
   $('mBack').onclick = () => { nav.jump(-1); closeMenu(); refreshCoverage(true); };
   $('mHere').onclick = () => { const moved = nav.continueHere(); closeMenu(); if (moved != null && moved > 10) toast(T.jumped(T.dist(moved))); refreshCoverage(true); };
   $('mShareMissed').onclick = () => shareGpx(missedGpx(c.missed), 'missed');
   $('mShareTrack').onclick = () => shareGpx(trackGpx(), 'driven');
   $('mAll').onclick = () => { settings.showAll = !settings.showAll; saveSettings(); showWholeDay(); openMenu(); };
-  $('mSim').onclick = () => { closeMenu(); if (sim) stopSim(true); else startSim(); };
+  $('mSim').onclick = () => { closeMenu(); if (paused) setPaused(false); if (sim) stopSim(true); else startSim(); };
   $('mEnd').onclick = () => { closeMenu(); stopNav(); };
   $('mClose').onclick = closeMenu;
 }
@@ -785,7 +823,6 @@ async function keepAwake() {
 let audioCtx = null, voiceList = [];
 function loadVoices() { try { voiceList = speechSynthesis.getVoices() || []; } catch { voiceList = []; } }
 if ('speechSynthesis' in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
-function availableVoiceLangs() { return new Set(voiceList.map((v) => (v.lang || '').slice(0, 2).toLowerCase())); }
 function pickVoice(code) {
   const list = voiceList.filter((v) => (v.lang || '').toLowerCase().startsWith(code));
   return list.find((v) => /enhanced|premium/i.test(v.name)) || list.find((v) => v.default) || list[0] || null;
@@ -870,43 +907,6 @@ function renderSimBar() {
   $('simStop').textContent = T.simStopShort; $('simStop').onclick = () => stopSim(true);
 }
 
-/* ------------------------------------------------------------------ checking the turns before driving */
-
-function openPreview(i) {
-  screen = 'preview';
-  $('home').hidden = true; $('navUi').hidden = true; $('previewUi').hidden = false;
-  ensureMap().then(() => { if (carMarker) carMarker.getElement().style.display = 'none'; showPreview(i); });
-}
-
-function showPreview(i) {
-  const R = day.route, P = day.proj, M = R.maneuvers;
-  previewIdx = clamp(i, 0, M.length - 1);
-  const m = M[previewIdx];
-  setLine('back', []); setLine('missed', []);
-  setLine('near', slice(R, P, m.along - 160, m.along + 60));
-  setLine('far', slice(R, P, m.along + 57, m.along + 450));
-  const a1 = m.kind === 'roundabout' && m.exitAt != null ? R.along[m.exitAt] + 14 : m.along + 20;
-  const arrow = m.kind === 'arrive' ? [] : slice(R, P, Math.max(0, m.along - 22), Math.min(R.total, a1));
-  setLine('man', arrow); setHead(arrow.length ? arrow : null);
-  const p = pointAt(R, m.along), q = pointAt(R, Math.max(0, m.along - 30));
-  const [lat, lon] = P.toLL(p[0], p[1]);
-  map.easeTo({ center: [lon, lat], bearing: bearing(q[0], q[1], p[0], p[1]), zoom: 17.6, pitch: 45, duration: 650,
-    padding: { top: 60, bottom: $('previewUi').querySelector('.preview-card').offsetHeight + 40, left: 0, right: 0 } });
-  $('pIcon').innerHTML = arrowSvg(m.kind, m.a, m.exit);
-  $('pInstr').textContent = kindText(m);
-  $('pStreet').textContent = streetText(m) || '';
-  $('pMeta').textContent = `${(m.along / 1000).toFixed(2)} km · ${T.of(previewIdx + 1, M.length)}`;
-  $('pPrev').textContent = T.prev; $('pNext').textContent = T.next; $('pStart').textContent = T.startHere; $('pClose').textContent = T.close;
-}
-$('pPrev').onclick = () => showPreview(previewIdx - 1);
-$('pNext').onclick = () => showPreview(previewIdx + 1);
-$('pClose').onclick = () => renderHome();
-$('pStart').onclick = () => {
-  const m = day.route.maneuvers[previewIdx];
-  nav = makeNav(true);
-  startNav({ along: Math.max(0, m.along - 80) });
-};
-
 /* ------------------------------------------------------------------ offline: keep this route's map */
 
 async function warmOffline(bbox) {
@@ -944,7 +944,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
   const saved = store.get(K.route, null);
   if (saved && saved.text) {
     $('home').innerHTML = `<div class="wrap"><div class="card"><span class="spinner"></span>${T.loadingMap}</div></div>`;
-    try { await openDay(saved.text, false); } catch (e) { console.error(e); day = null; }
+    try { await openDay(saved.text, false, saved.name); } catch (e) { console.error(e); day = null; }
   } else loadNetwork();
   renderHome();
 })();
@@ -956,8 +956,10 @@ window.__sn = {
   sim: (mult = 4) => { simMult = mult; startSim(); },
   miss: () => sim && sim.planMiss(),
   stopSim: () => stopSim(false),
-  preview: (i) => openPreview(i),
   menu: () => openMenu(),
+  pause: () => pauseNav(),
+  resume: () => resumeNav(),
+  get follow() { return follow; }, get paused() { return paused; },
   snap: () => lastSnap && { mode: lastSnap.mode, along: lastSnap.along, next: lastSnap.next && { kind: lastSnap.next.m.kind, dist: lastSnap.next.dist }, back: !!lastSnap.back },
   coverage: () => nav && nav.coverage(),
   feed: (fix) => handleFix(fix),
