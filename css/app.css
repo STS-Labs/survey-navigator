@@ -99,7 +99,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: flex; flex-direction: column; gap: 10px; pointer-events: none;
 }
 .dock > * { pointer-events: auto; }
-#btnRecenter { align-self: flex-end; margin-right: -4px; }
+/* bottom row: skip on the left (away from menu, sound and pause), re-centre on the right */
+.dock > .dock-row { display: flex; align-items: flex-end; pointer-events: none; }
+.dock-row > * { pointer-events: auto; }
+#btnSkip { margin-left: -4px; }
+#btnRecenter { margin-left: auto; margin-right: -4px; }
 .toast {
   display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 18px; border-radius: 18px;
   font: 500 17px/1.35 var(--font);
@@ -143,8 +147,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .car.paused .ring { stroke: var(--t3); }
 .car.paused svg { filter: none; }
 
-/* map credits: a small (i) under the column of round buttons */
-.maplibregl-ctrl-top-right { top: calc(var(--st) + 264px); right: calc(var(--sr) + 26px); }
+/* map credits: a small (i) under the pause button */
+.maplibregl-ctrl-top-right { top: calc(var(--st) + 202px); right: calc(var(--sr) + 26px); }
 .maplibregl-ctrl-top-right .maplibregl-ctrl { margin: 0; }
 .maplibregl-ctrl-attrib.maplibregl-compact { min-height: 24px; background: var(--glass); border: 1px solid var(--hair); color: var(--t2); font: 400 11px/1.4 var(--font); }
 .maplibregl-ctrl-attrib a { color: var(--t2); }
@@ -253,7 +257,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @media (orientation: landscape) and (max-height: 560px) {
   .top { top: calc(var(--st) + 12px); left: calc(var(--sl) + 8px); right: auto; width: min(300px, 40vw); }
   .side { top: calc(var(--st) + 12px); }
-  .maplibregl-ctrl-top-right { top: calc(var(--st) + 268px); }
+  .maplibregl-ctrl-top-right { top: calc(var(--st) + 206px); }
   .bottom, .dock { left: calc(var(--sl) + 16px); right: auto; width: min(361px, 46vw); }
+  /* skip: bottom right, far below pause (the left column has the card, messages and the status line) */
+  #btnSkip { position: fixed; z-index: 10; right: calc(var(--sr) + 12px); bottom: calc(var(--sb) + 10px); margin: 0; }
   .fade { height: calc(var(--sb) + 130px); }
 }

@@ -6,7 +6,7 @@ import { arrowSvg, UI, CAR_SVG } from './icons.js';
 import { SURVEY_DAYS, loadSurveyDay } from './days.js';
 import { VOICE_DIR, VOICE_CLIPS, clipsFor, gapAfter } from './voice.js';
 
-const APP_VERSION = '1.5.5 (15 Oct 2026)';
+const APP_VERSION = '1.5.6 (15 Oct 2026)';
 const NET_URL = 'data/tbilisi-net.json';
 const STYLE = 'https://tiles.openfreemap.org/styles/liberty';      // recoloured to the night design on load
 const TILEJSON = 'https://tiles.openfreemap.org/planet';
@@ -829,9 +829,10 @@ function toast(text, btnText, onBtn) {
   toastTimer = setTimeout(() => { $('toast').hidden = true; }, btnText ? 15000 : 4000);
 }
 
-// Skip the next turn (a closed street): the round button under pause. It works whenever the car is being
-// led somewhere (the route, the way back to it, the way to the start or to where the drive stopped) and a
-// turn is ahead; greyed out while waiting for GPS, while paused and on the last stretch
+// Skip the next turn (a closed street): the round button bottom left (bottom right sideways), away from
+// menu, sound and pause so it is not hit by accident. It works whenever the car is being led somewhere
+// (the route, the way back to it, the way to the start or to where the drive stopped) and a turn is
+// ahead; greyed out while waiting for GPS, while paused and on the last stretch
 function canSkip(snap) {
   if (paused || !nav || !nav.lastFix || !snap || (snap.mode !== 'route' && snap.mode !== 'back')) return false;
   const i = nav.nextManeuverIndex(nav.along);

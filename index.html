@@ -54,10 +54,12 @@
       <button id="btnMenu" class="round glass" aria-label="Menu"></button>
       <button id="btnMute" class="round glass" aria-label="Sound"></button>
       <button id="btnPause" class="round glass" aria-label="Pause"></button>
-      <button id="btnSkip" class="round glass" aria-label="Skip"></button>
     </div>
     <div class="dock" id="dock">
-      <button id="btnRecenter" class="round accent" hidden aria-label="Back to the car"></button>
+      <div class="dock-row">
+        <button id="btnSkip" class="round glass" aria-label="Skip"></button>
+        <button id="btnRecenter" class="round accent" hidden aria-label="Back to the car"></button>
+      </div>
       <div id="toast" class="glass toast" hidden><span id="toastText"></span><button id="toastBtn" hidden></button></div>
       <div id="simBar" class="glass simbar" hidden>
         <div class="sim-head"><span id="simTitle"></span><div class="seg3"><button data-mult="1">1×</button><button data-mult="4">4×</button><button data-mult="10">10×</button></div></div>

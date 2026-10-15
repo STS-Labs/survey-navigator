@@ -35,11 +35,13 @@ The look is the night design approved in Figma on 14 Oct 2026 (file "Survey Navi
 Georgian, both kept in `fonts/` so they work offline.
 
 The driving screen: the instruction card top left (arrow, distance, what to do, street), and top right a
-column of round buttons: menu, sound, pause (while paused it turns violet with a play sign: tap it to
-continue) and **skip** (⏭, skips the next turn when the street is closed: the stretch goes on the missed
-list, the voice says so and the message offers the way back). Skip works whenever the app is leading the
-car somewhere (the route, the way back to it, the way to the start or to where the drive stopped); it is
-grey while waiting for GPS, while paused and on the last stretch. At the bottom a slim line with the time
+column of round buttons: menu, sound and pause (while paused it turns violet with a play sign: tap it to
+continue). **Skip** (⏭) sits on its own in the bottom-left corner (bottom right when the phone is
+sideways), away from the other buttons so that it is not tapped by accident; a message on the screen
+pushes it up. It skips the next turn when the street is closed: the stretch goes on the missed list, the
+voice says so and the message offers the way back. Skip works whenever the app is leading the car
+somewhere (the route, the way back to it, the way to the start or to where the drive stopped); it is grey
+while waiting for GPS, while paused and on the last stretch. At the bottom a slim line with the time
 left (green), km left and the time the day ends (violet), a GPS dot (green good, amber rough, red poor,
 grey none) and the progress line (red marks = missed stretches). Under the card: **შემდეგ** (the turn
 right after this one). The card is orange with a tag after leaving the route, blue on the way to the
