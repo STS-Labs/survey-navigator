@@ -800,7 +800,7 @@ export class Navigator {
     this.along = clamp(along, 0, this.r.total);
     if (this.startAlong == null) this.startAlong = this.along;
     this.lastGood = this.along;
-    this.mode = 'acquire'; this.back = null; this.offCount = 0; this.forkCount = 0; this.skipRun = null;
+    this.mode = 'acquire'; this.back = null; this.offCount = 0; this.forkCount = 0; this.skipRun = null; this.jumped = false;
   }
 
   restore(state) {
@@ -839,6 +839,7 @@ export class Navigator {
     }
     this.along = target; this.lastGood = target; this.markFrom = null;
     this.mode = 'acquire'; this.back = null; this.offCount = 0; this.forkCount = 0;
+    this.jumped = dir > 0;          // if the car is not there, the way to it is "to the route", not "to where you stopped"
     return this.along;
   }
 
@@ -947,7 +948,8 @@ export class Navigator {
         this.along = Math.max(this.along, m.along); this.lastGood = this.along; this.mode = 'route'; this.offCount = 0;
         this.markFrom = this.along < 10 ? 0 : this.along;
       }
-      else this.leave(fix, heading, this.along < 1 ? 'start' : 'resume');
+      else this.leave(fix, heading, this.jumped ? 'next' : this.along < 1 ? 'start' : 'resume');
+      this.jumped = false;
     } else if (this.mode === 'route') {
       // Only places the car could have reached since the last fix; after a long gap, look further
       const gap = dt > 4, v = Math.max(speed, gap ? 8 : 0);

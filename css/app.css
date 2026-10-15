@@ -72,10 +72,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .then { color: var(--t2); }
 .then-icon { width: 22px; height: 22px; display: inline-block; color: var(--t1); }
-.then-icon svg, .skip-icon svg { width: 100%; height: 100%; display: block; }
-.skip { margin-left: auto; padding: 0 16px 0 12px; color: var(--t1); }
-.skip-icon { width: 20px; height: 20px; display: inline-block; }
-.skip:active, .round:active, .btn:active, .sheet .item:active, .tile:active { filter: brightness(1.25); }
+.then-icon svg { width: 100%; height: 100%; display: block; }
+.round:active, .btn:active, .sheet .item:active, .tile:active { filter: brightness(1.25); }
 
 .side {
   position: fixed; z-index: 10; top: calc(var(--st) + 8px); right: calc(var(--sr) + 12px);
@@ -84,6 +82,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .round { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; padding: 0; color: var(--t1); }
 .round svg { width: 24px; height: 24px; display: block; }
 .round.accent { background: var(--violet-strong); border: 0; box-shadow: var(--glow); }
+.round:disabled { color: var(--t3); }              /* skip, while there is nothing to skip */
 
 .gpshelp, .pausecard { margin-top: 8px; border-radius: 22px; padding: 16px; pointer-events: auto; }
 .gh-head { display: flex; gap: 10px; align-items: flex-start; }
@@ -144,8 +143,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .car.paused .ring { stroke: var(--t3); }
 .car.paused svg { filter: none; }
 
-/* map credits: a small (i) under the sound button */
-.maplibregl-ctrl-top-right { top: calc(var(--st) + 202px); right: calc(var(--sr) + 26px); }
+/* map credits: a small (i) under the column of round buttons */
+.maplibregl-ctrl-top-right { top: calc(var(--st) + 264px); right: calc(var(--sr) + 26px); }
 .maplibregl-ctrl-top-right .maplibregl-ctrl { margin: 0; }
 .maplibregl-ctrl-attrib.maplibregl-compact { min-height: 24px; background: var(--glass); border: 1px solid var(--hair); color: var(--t2); font: 400 11px/1.4 var(--font); }
 .maplibregl-ctrl-attrib a { color: var(--t2); }
@@ -254,7 +253,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @media (orientation: landscape) and (max-height: 560px) {
   .top { top: calc(var(--st) + 12px); left: calc(var(--sl) + 8px); right: auto; width: min(300px, 40vw); }
   .side { top: calc(var(--st) + 12px); }
-  .maplibregl-ctrl-top-right { top: calc(var(--st) + 206px); }
+  .maplibregl-ctrl-top-right { top: calc(var(--st) + 268px); }
   .bottom, .dock { left: calc(var(--sl) + 16px); right: auto; width: min(361px, 46vw); }
   .fade { height: calc(var(--sb) + 130px); }
 }

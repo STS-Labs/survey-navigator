@@ -34,13 +34,17 @@ The look is the night design approved in Figma on 14 Oct 2026 (file "Survey Navi
 "Design (night)"): navy map, glass cards, violet accent, fonts Inter (numbers, Latin) and Noto Sans
 Georgian, both kept in `fonts/` so they work offline.
 
-The driving screen: the instruction card top left (arrow, distance, what to do, street), menu, sound and
-pause top right (while paused the pause button turns violet with a play sign: tap it to continue), and at the bottom a slim line with the time left (green), km left and the time the day ends
-(violet), a GPS dot (green good, amber rough, red poor, grey none) and the progress line (red marks =
-missed stretches). Under the card: **შემდეგ** (the turn right after this one) and **გამოტოვება**, which
-skips the next turn (closed street): the stretch goes on the missed list and the message offers the way back.
-The card is orange with a tag after leaving the route, blue on the way to the start or back to where the
-drive stopped, grey while waiting for GPS or paused.
+The driving screen: the instruction card top left (arrow, distance, what to do, street), and top right a
+column of round buttons: menu, sound, pause (while paused it turns violet with a play sign: tap it to
+continue) and **skip** (⏭, skips the next turn when the street is closed: the stretch goes on the missed
+list, the voice says so and the message offers the way back). Skip works whenever the app is leading the
+car somewhere (the route, the way back to it, the way to the start or to where the drive stopped); it is
+grey while waiting for GPS, while paused and on the last stretch. At the bottom a slim line with the time
+left (green), km left and the time the day ends (violet), a GPS dot (green good, amber rough, red poor,
+grey none) and the progress line (red marks = missed stretches). Under the card: **შემდეგ** (the turn
+right after this one). The card is orange with a tag after leaving the route, blue on the way to the
+start, back to where the drive stopped or to the route after a skip (**მარშრუტისკენ**), grey while
+waiting for GPS or paused.
 
 On the map: **blue to violet** = the next 320 m, dimmer violet = the road after that, white arrow = the next
 turn, **orange** = the way back after a missed turn (**blue** on the way to the start or to where the drive

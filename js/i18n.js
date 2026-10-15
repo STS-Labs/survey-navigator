@@ -46,6 +46,7 @@ export const STR = {
     offRoute: 'Off route: follow the orange line',
     toStart: 'Drive to the start of the route',
     toResume: 'Drive back to where you stopped',
+    toNext: 'Drive to the route after the skipped turn',
     noWayBack: 'Head back to the route',
     done: 'Route complete',
     report: (d, n, m) => `${d} km driven. ${n ? `${n} missed ${n === 1 ? 'stretch' : 'stretches'} (${m}).` : 'Nothing missed.'}`,
@@ -106,8 +107,7 @@ export const STR = {
     version: 'Version',
     about: 'Street data © OpenStreetMap contributors.',
     // night design (1.5)
-    tagOff: 'Off the route', tagStart: 'To the start', tagResume: 'Back to where you stopped', tagPaused: 'Paused',
-    skipShort: 'Skip',
+    tagOff: 'Off the route', tagStart: 'To the start', tagResume: 'Back to where you stopped', tagNext: 'To the route', tagPaused: 'Paused',
     km: (v) => `${v} km`,
     timeLeft: (h, m) => (h ? `${h} h ${m} min` : `${m} min`),
     // voice choice (1.5.4)
@@ -154,6 +154,7 @@ export const STR = {
     offRoute: 'მიჰყევით ნარინჯისფერ ხაზს',
     toStart: 'მიდით მარშრუტის დასაწყისამდე',
     toResume: 'დაბრუნდით იქ, სადაც გაჩერდით',
+    toNext: 'მიდით მარშრუტამდე გამოტოვებული მოსახვევის შემდეგ',
     noWayBack: 'დაბრუნდით მარშრუტზე',
     done: 'მარშრუტი დასრულდა',
     report: (d, n, m) => `გავლილია ${d} კმ. ${n ? `გამოტოვებული მონაკვეთები: ${n} (${m}).` : 'არაფერი გამოტოვებულა.'}`,
@@ -214,8 +215,7 @@ export const STR = {
     version: 'ვერსია',
     about: 'ქუჩების მონაცემები © OpenStreetMap contributors.',
     // night design (1.5)
-    tagOff: 'მარშრუტს გადაუხვიეთ', tagStart: 'დასაწყისისკენ', tagResume: 'გაჩერების ადგილისკენ', tagPaused: 'პაუზა',
-    skipShort: 'გამოტოვება',
+    tagOff: 'მარშრუტს გადაუხვიეთ', tagStart: 'დასაწყისისკენ', tagResume: 'გაჩერების ადგილისკენ', tagNext: 'მარშრუტისკენ', tagPaused: 'პაუზა',
     km: (v) => `${v} კმ`,
     timeLeft: (h, m) => (h ? `${h} სთ ${m} წთ` : `${m} წთ`),
     // voice choice (1.5.4)

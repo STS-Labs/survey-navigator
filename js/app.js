@@ -6,7 +6,7 @@ import { arrowSvg, UI, CAR_SVG } from './icons.js';
 import { SURVEY_DAYS, loadSurveyDay } from './days.js';
 import { VOICE_DIR, VOICE_CLIPS, clipsFor, gapAfter } from './voice.js';
 
-const APP_VERSION = '1.5.4 (14 Oct 2026)';
+const APP_VERSION = '1.5.5 (15 Oct 2026)';
 const NET_URL = 'data/tbilisi-net.json';
 const STYLE = 'https://tiles.openfreemap.org/styles/liberty';      // recoloured to the night design on load
 const TILEJSON = 'https://tiles.openfreemap.org/planet';
@@ -688,7 +688,7 @@ function setCard({ tone = 'violet', tag = '', icon = '', dist = '', instr = '', 
 
 function renderWaiting(msg) {
   setCard({ tone: 'grey', icon: UI.gps, instr: day ? day.name : '', street: msg });
-  $('thenChip').hidden = true; $('btnSkip').hidden = true;
+  $('thenChip').hidden = true; $('btnSkip').disabled = true;
 }
 
 // Time left, km left and the time the day ends, from the driving speed so far
@@ -714,14 +714,14 @@ function render(snap, fix, dur) {
     card = { icon: arrowSvg('arrive'), instr: day.name, street: T.done };
   } else if (snap.mode === 'back') {
     const why = snap.back.why;
-    card = { tone: why === 'off' ? 'orange' : 'blue', tag: why === 'off' ? T.tagOff : why === 'start' ? T.tagStart : T.tagResume };
+    card = { tone: why === 'off' ? 'orange' : 'blue', tag: why === 'off' ? T.tagOff : why === 'start' ? T.tagStart : why === 'next' ? T.tagNext : T.tagResume };
     if (snap.next) {
       const m = snap.next.m;
       Object.assign(card, { icon: arrowSvg(m.kind, m.a, m.exit), dist: T.dist(snap.next.dist), instr: kindText(m), street: m.kind === 'rejoin' ? '' : streetText(m) });
     } else {
       const tp = pointAt(R, snap.back.target.along), brg = bearing(fix.x, fix.y, tp[0], tp[1]);
       Object.assign(card, { icon: arrowSvg('direction', angleDiff(nav.heading ?? brg, brg)), dist: T.dist(Math.hypot(tp[0] - fix.x, tp[1] - fix.y)),
-        instr: why === 'off' ? T.noWayBack : why === 'start' ? T.toStart : T.toResume });
+        instr: why === 'off' ? T.noWayBack : why === 'start' ? T.toStart : why === 'next' ? T.toNext : T.toResume });
     }
     setBackTone(why);
   } else if (snap.mode === 'acquire') {
@@ -735,8 +735,7 @@ function render(snap, fix, dur) {
   const showThen = th && snap.next && snap.mode !== 'done' && th.gap < 120 && snap.next.dist < 450;
   $('thenChip').hidden = !showThen;
   if (showThen) { $('thenLabel').textContent = T.then; $('thenIcon').innerHTML = arrowSvg(th.m.kind, th.m.a, th.m.exit); }
-  // Skip the next turn (a closed street): while following the route, or after leaving it
-  $('btnSkip').hidden = !(snap.next && snap.next.m.kind !== 'arrive' && (snap.mode === 'route' || (snap.mode === 'back' && snap.back.why === 'off')));
+  $('btnSkip').disabled = !canSkip(snap);
 
   // Route on the map: only what is ahead
   if (mapReady) {
@@ -811,8 +810,7 @@ $('btnRecenter').innerHTML = UI.recentre;
 $('btnMenu').innerHTML = UI.menu;
 $('btnMenu').setAttribute('aria-label', T.menu);
 $('ghIcon').innerHTML = UI.gps;
-$('skipIcon').innerHTML = UI.skip;
-$('skipLabel').textContent = T.skipShort;
+$('btnSkip').innerHTML = UI.skip;
 $('btnSkip').setAttribute('aria-label', T.skipTurn);
 function renderMute() {
   $('btnMute').innerHTML = settings.muted ? UI.soundOff : UI.soundOn;
@@ -831,13 +829,23 @@ function toast(text, btnText, onBtn) {
   toastTimer = setTimeout(() => { $('toast').hidden = true; }, btnText ? 15000 : 4000);
 }
 
-// Skip the next turn (a closed street): the stretch goes on the missed list, and the message offers the way back
+// Skip the next turn (a closed street): the round button under pause. It works whenever the car is being
+// led somewhere (the route, the way back to it, the way to the start or to where the drive stopped) and a
+// turn is ahead; greyed out while waiting for GPS, while paused and on the last stretch
+function canSkip(snap) {
+  if (paused || !nav || !nav.lastFix || !snap || (snap.mode !== 'route' && snap.mode !== 'back')) return false;
+  const i = nav.nextManeuverIndex(nav.along);
+  return i < nav.man.length && nav.man[i].kind !== 'arrive';
+}
+// The stretch goes on the missed list, and the message offers the way back
 $('btnSkip').onclick = () => {
-  if (!nav || paused || screen !== 'nav') return;
+  if (!nav || paused || screen !== 'nav' || !canSkip(lastSnap)) return;
   const from = nav.along, before = nav.skips.length, to = nav.jump(1);
-  $('btnSkip').hidden = true;
+  $('btnSkip').disabled = true;           // the next GPS reading brings the new instruction (and the button back)
+  speak({ type: 'skip', meters: Math.round(to - from) });
   if (nav.skips.length > before) toast(T.skipped(T.dist(to - from)), T.goBack, () => { if (nav.undoSkip()) rerender(nav.snapshot()); refreshCoverage(); });
-  refreshCoverage();                      // the next GPS reading brings the new instruction
+  else toast(T.skipped(T.dist(to - from)));
+  refreshCoverage();
 };
 
 /* ------------------------------------------------------------------ pause (a break: no GPS, no guidance) */
@@ -862,7 +870,7 @@ function pauseNav() {
   speak({ type: 'paused' });
   if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
   setCard({ tone: 'grey', tag: T.tagPaused, icon: UI.pause, instr: day.name, street: T.pausedTitle });
-  $('thenChip').hidden = true; $('btnSkip').hidden = true;
+  $('thenChip').hidden = true; $('btnSkip').disabled = true;
   $('pcText').textContent = T.pausedText; $('pcResume').textContent = T.resumeNav;
   setLine('man', []); setHead(null);
   renderGpsChip();
